@@ -226,7 +226,11 @@ const PageWrapper = React.memo(
     }, []);
 
     const style = useAnimatedStyle(() => {
+      const isActivePage = Math.round(pageAnim.value);
+      const hasInitialized = pageWidth.value > 0;
+      const opacity = hasInitialized || isActivePage ? 1 : 0;
       return {
+        opacity,
         position: "absolute",
         left: 0,
         right: 0,
