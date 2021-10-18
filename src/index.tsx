@@ -1,4 +1,9 @@
-import React, { useState, useImperativeHandle, useCallback } from "react";
+import React, {
+  useState,
+  useImperativeHandle,
+  useCallback,
+  useRef,
+} from "react";
 import { StyleSheet } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -59,6 +64,9 @@ function InfinitePager(
   const pageAnimInternal = useSharedValue(0);
   const pageAnim = pageCallbackNode || pageAnimInternal;
 
+  const curIndexRef = useRef(curIndex);
+  curIndexRef.current = curIndex;
+
   const setPage = useCallback(
     (index: number, options: ImperativeApiOptions = {}) => {
       const updatedTranslateX = index * pageWidth.value * -1;
@@ -79,10 +87,10 @@ function InfinitePager(
     () => ({
       setPage,
       incrementPage: (options?: ImperativeApiOptions) => {
-        setPage(curIndex + 1, options);
+        setPage(curIndexRef.current + 1, options);
       },
       decrementPage: (options?: ImperativeApiOptions) => {
-        setPage(curIndex - 1, options);
+        setPage(curIndexRef.current - 1, options);
       },
     }),
     [setPage]
@@ -196,13 +204,13 @@ const PageWrapper = React.memo(
 
     const animStyle = useAnimatedStyle(() => {
       const hasInitialized = pageWidth.value > 0;
-      const isFullOpacity = hasInitialized || isActive.value;
+      const isFullOpacity = hasInitialized || isActive;
       const opacity = isFullOpacity ? 1 : 0;
       return {
         opacity,
         transform: [{ translateX: translation.value }],
       };
-    }, [pageWidth, pageAnim, index, translation]);
+    }, [pageWidth, pageAnim, index, translation, isActive]);
 
     return (
       <Animated.View
