@@ -1,4 +1,9 @@
-import React, { useState, useImperativeHandle } from "react";
+import React, {
+  useState,
+  useImperativeHandle,
+  useCallback,
+  useMemo,
+} from "react";
 import { View } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -24,11 +29,15 @@ export const DEFAULT_ANIMATION_CONFIG: Animated.WithSpringConfig = {
   restDisplacementThreshold: 0.2,
 };
 
+type PageComponentType = (props: {
+  index: number;
+  focusAnim: Animated.DerivedValue<number>;
+}) => JSX.Element | null;
+
 type Props = {
-  PageComponent: (props: {
-    index: number;
-    focusAnim: Animated.SharedValue<number>;
-  }) => JSX.Element;
+  PageComponent:
+    | PageComponentType
+    | React.MemoExoticComponent<PageComponentType>;
   pageCallbackNode?: Animated.SharedValue<number>;
   onPageChange?: (page: number) => void;
   pageBuffer?: number; // number of pages to render on either side of active page
@@ -54,27 +63,34 @@ function InfinitePager(
   const pageAnimInternal = useSharedValue(0);
   const pageAnim = pageCallbackNode || pageAnimInternal;
 
-  function setPage(index: number, options: ImperativeApiOptions = {}) {
-    const updatedTranslateX = index * pageWidth.value * -1;
-    if (options.animated) {
-      translateX.value = withSpring(
-        updatedTranslateX,
-        DEFAULT_ANIMATION_CONFIG
-      );
-    } else {
-      translateX.value = updatedTranslateX;
-    }
-  }
+  const setPage = useCallback(
+    (index: number, options: ImperativeApiOptions = {}) => {
+      const updatedTranslateX = index * pageWidth.value * -1;
+      if (options.animated) {
+        translateX.value = withSpring(
+          updatedTranslateX,
+          DEFAULT_ANIMATION_CONFIG
+        );
+      } else {
+        translateX.value = updatedTranslateX;
+      }
+    },
+    []
+  );
 
-  useImperativeHandle(ref, () => ({
-    setPage,
-    incrementPage: (options?: ImperativeApiOptions) => {
-      setPage(curIndex + 1, options);
-    },
-    decrementPage: (options?: ImperativeApiOptions) => {
-      setPage(curIndex - 1, options);
-    },
-  }));
+  useImperativeHandle(
+    ref,
+    () => ({
+      setPage,
+      incrementPage: (options?: ImperativeApiOptions) => {
+        setPage(curIndex + 1, options);
+      },
+      decrementPage: (options?: ImperativeApiOptions) => {
+        setPage(curIndex - 1, options);
+      },
+    }),
+    [setPage]
+  );
 
   const pageIndices = [...Array(pageBuffer * 2 + 1)].map((_, i) => {
     const bufferIndex = i - pageBuffer;
@@ -107,38 +123,29 @@ function InfinitePager(
   const gestureHandler = useAnimatedGestureHandler<
     GestureEvent<PanGestureHandlerEventPayload>,
     { startX: number }
-  >({
-    onStart: (_, ctx) => {
-      ctx.startX = translateX.value;
+  >(
+    {
+      onStart: (_, ctx) => {
+        ctx.startX = translateX.value;
+      },
+      onActive: (event, ctx) => {
+        translateX.value = ctx.startX + event.translationX;
+      },
+      onEnd: (evt) => {
+        const isFling = Math.abs(evt.velocityX) > 500;
+        let velocityModifier = isFling ? pageWidth.value / 2 : 0;
+        if (evt.velocityX < 0) velocityModifier *= -1;
+        const page = Math.round(
+          (translateX.value + velocityModifier) / pageWidth.value
+        );
+        translateX.value = withSpring(
+          page * pageWidth.value,
+          DEFAULT_ANIMATION_CONFIG
+        );
+      },
     },
-    onActive: (event, ctx) => {
-      translateX.value = ctx.startX + event.translationX;
-    },
-    onEnd: (evt) => {
-      const isFling = Math.abs(evt.velocityX) > 500;
-      let velocityModifier = isFling ? pageWidth.value / 2 : 0;
-      if (evt.velocityX < 0) velocityModifier *= -1;
-      const page = Math.round(
-        (translateX.value + velocityModifier) / pageWidth.value
-      );
-      translateX.value = withSpring(
-        page * pageWidth.value,
-        DEFAULT_ANIMATION_CONFIG
-      );
-    },
-  });
-
-  function getPage(idx: number) {
-    return (
-      <Page
-        key={`page-${idx}`}
-        pageAnim={pageAnim}
-        index={idx}
-        pageWidth={pageWidth}
-        ClientPage={PageComponent}
-      />
-    );
-  }
+    []
+  );
 
   return (
     <Animated.View>
@@ -148,60 +155,98 @@ function InfinitePager(
             (pageWidth.value = nativeEvent.layout.width)
           }
         >
-          <View
-            pointerEvents="none"
-            style={{ opacity: 0, transform: [{ translateX: 100000 }] }}
-          >
-            <PageComponent index={curIndex} focusAnim={{ value: 1 }} />
-          </View>
-          {pageIndices.map(getPage)}
+          {pageIndices.map((pageIndex) => {
+            return (
+              <PageWrapper
+                key={`page-provider-wrapper-${pageIndex}`}
+                pageAnim={pageAnim}
+                index={pageIndex}
+                pageWidth={pageWidth}
+              >
+                {({ index, focusAnim, style }) => {
+                  return (
+                    <>
+                      <Animated.View style={style}>
+                        <PageComponent
+                          key={`page-${pageIndex}`}
+                          index={index}
+                          focusAnim={focusAnim}
+                        />
+                      </Animated.View>
+                      {index === curIndex && (
+                        <View
+                          style={{ transform: [{ translateX: 100000 }] }}
+                          pointerEvents="none"
+                        >
+                          <PageComponent
+                            key={`page-${pageIndex}`}
+                            index={index}
+                            focusAnim={focusAnim}
+                          />
+                        </View>
+                      )}
+                    </>
+                  );
+                }}
+              </PageWrapper>
+            );
+          })}
         </Animated.View>
       </PanGestureHandler>
     </Animated.View>
   );
 }
 
-const Page = ({
-  ClientPage,
-  index,
-  pageAnim,
-  pageWidth,
-}: {
+type PageContextType = {
+  style: ReturnType<typeof useAnimatedStyle>;
+  index: number;
+  focusAnim: Animated.DerivedValue<number>;
+};
+
+type PageWrapperProps = {
   pageAnim: Animated.SharedValue<number>;
   index: number;
   pageWidth: Animated.SharedValue<number>;
-  ClientPage: (props: {
-    index: number;
-    focusAnim: Animated.DerivedValue<number>;
-  }) => JSX.Element | null;
-}) => {
-  const translation = useDerivedValue(() => {
-    const translateX = (index - pageAnim.value) * pageWidth.value;
-    return translateX;
-  }, []);
-
-  const focusAnim = useDerivedValue(() => {
-    const zeroFocused = Math.abs(translation.value) / pageWidth.value;
-    const oneFocused = (zeroFocused - 1) * -1;
-    return oneFocused;
-  }, []);
-
-  const style = useAnimatedStyle(() => {
-    return {
-      position: "absolute",
-      left: 0,
-      right: 0,
-      top: 0,
-      bottom: 0,
-      transform: [{ translateX: translation.value }],
-    };
-  }, []);
-
-  return (
-    <Animated.View style={style}>
-      <ClientPage index={index} focusAnim={focusAnim} />
-    </Animated.View>
-  );
+  children: (renderProps: PageContextType) => React.ReactChild;
 };
 
-export default React.forwardRef(InfinitePager);
+const PageContext = React.createContext<PageContextType | undefined>(undefined);
+
+const PageWrapper = React.memo(
+  ({ index, pageAnim, pageWidth, children }: PageWrapperProps) => {
+    const translation = useDerivedValue(() => {
+      const translateX = (index - pageAnim.value) * pageWidth.value;
+      return translateX;
+    }, []);
+
+    const focusAnim = useDerivedValue(() => {
+      const zeroFocused = Math.abs(translation.value) / pageWidth.value;
+      const oneFocused = (zeroFocused - 1) * -1;
+      return oneFocused;
+    }, []);
+
+    const style = useAnimatedStyle(() => {
+      return {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        transform: [{ translateX: translation.value }],
+      };
+    }, []);
+
+    const value = useMemo(
+      () => ({ style, index, focusAnim }),
+      [style, index, focusAnim]
+    );
+
+    return (
+      <PageContext.Provider value={value}>
+        {children(value)}
+      </PageContext.Provider>
+    );
+  }
+);
+
+export default React.memo(React.forwardRef(InfinitePager));
