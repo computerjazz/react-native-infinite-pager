@@ -1,10 +1,5 @@
-import React, {
-  useState,
-  useImperativeHandle,
-  useCallback,
-  useMemo,
-} from "react";
-import { View } from "react-native";
+import React, { useState, useImperativeHandle, useCallback } from "react";
+import { StyleSheet } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useAnimatedGestureHandler,
@@ -32,6 +27,7 @@ export const DEFAULT_ANIMATION_CONFIG: Animated.WithSpringConfig = {
 type PageComponentType = (props: {
   index: number;
   focusAnim: Animated.DerivedValue<number>;
+  isActive: boolean;
 }) => JSX.Element | null;
 
 type Props = {
@@ -148,72 +144,45 @@ function InfinitePager(
   );
 
   return (
-    <Animated.View>
-      <PanGestureHandler onGestureEvent={gestureHandler}>
-        <Animated.View
-          onLayout={({ nativeEvent }) =>
-            (pageWidth.value = nativeEvent.layout.width)
-          }
-        >
-          {pageIndices.map((pageIndex) => {
-            return (
-              <PageWrapper
-                key={`page-provider-wrapper-${pageIndex}`}
-                pageAnim={pageAnim}
-                index={pageIndex}
-                pageWidth={pageWidth}
-              >
-                {({ index, focusAnim, style }) => {
-                  return (
-                    <>
-                      <Animated.View style={style}>
-                        <PageComponent
-                          key={`page-${pageIndex}`}
-                          index={index}
-                          focusAnim={focusAnim}
-                        />
-                      </Animated.View>
-                      {index === curIndex && (
-                        <View
-                          style={{ transform: [{ translateX: 100000 }] }}
-                          pointerEvents="none"
-                        >
-                          <PageComponent
-                            key={`page-${pageIndex}`}
-                            index={index}
-                            focusAnim={focusAnim}
-                          />
-                        </View>
-                      )}
-                    </>
-                  );
-                }}
-              </PageWrapper>
-            );
-          })}
-        </Animated.View>
-      </PanGestureHandler>
-    </Animated.View>
+    <PanGestureHandler onGestureEvent={gestureHandler}>
+      <Animated.View
+        onLayout={({ nativeEvent }) =>
+          (pageWidth.value = nativeEvent.layout.width)
+        }
+      >
+        {pageIndices.map((pageIndex) => {
+          return (
+            <PageWrapper
+              key={`page-provider-wrapper-${pageIndex}`}
+              pageAnim={pageAnim}
+              index={pageIndex}
+              pageWidth={pageWidth}
+              isActive={pageIndex === curIndex}
+              PageComponent={PageComponent}
+            />
+          );
+        })}
+      </Animated.View>
+    </PanGestureHandler>
   );
 }
-
-type PageContextType = {
-  style: ReturnType<typeof useAnimatedStyle>;
-  index: number;
-  focusAnim: Animated.DerivedValue<number>;
-};
 
 type PageWrapperProps = {
   pageAnim: Animated.SharedValue<number>;
   index: number;
   pageWidth: Animated.SharedValue<number>;
-  children: (renderProps: PageContextType) => React.ReactChild;
+  PageComponent: PageComponentType;
+  isActive: boolean;
 };
 
-const PageContext = React.createContext<PageContextType | undefined>(undefined);
-
 const PageWrapper = React.memo(
-  ({ index, pageAnim, pageWidth, children }: PageWrapperProps) => {
+  ({
+    index,
+    pageAnim,
+    pageWidth,
+    PageComponent,
+    isActive,
+  }: PageWrapperProps) => {
     const translation = useDerivedValue(() => {
       const translateX = (index - pageAnim.value) * pageWidth.value;
       return translateX;
@@ -225,32 +194,41 @@ const PageWrapper = React.memo(
       return oneFocused;
     }, []);
 
-    const style = useAnimatedStyle(() => {
-      const isActivePage = Math.round(pageAnim.value);
+    const animStyle = useAnimatedStyle(() => {
       const hasInitialized = pageWidth.value > 0;
-      const opacity = hasInitialized || isActivePage ? 1 : 0;
+      const isFullOpacity = hasInitialized || isActive.value;
+      const opacity = isFullOpacity ? 1 : 0;
       return {
         opacity,
-        position: "absolute",
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
         transform: [{ translateX: translation.value }],
       };
-    }, []);
-
-    const value = useMemo(
-      () => ({ style, index, focusAnim }),
-      [style, index, focusAnim]
-    );
+    }, [pageWidth, pageAnim, index, translation]);
 
     return (
-      <PageContext.Provider value={value}>
-        {children(value)}
-      </PageContext.Provider>
+      <Animated.View
+        style={[styles.pageWrapper, animStyle, isActive && styles.activePage]}
+      >
+        <PageComponent
+          index={index}
+          isActive={isActive}
+          focusAnim={focusAnim}
+        />
+      </Animated.View>
     );
   }
 );
 
 export default React.memo(React.forwardRef(InfinitePager));
+
+const styles = StyleSheet.create({
+  pageWrapper: {
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    position: "absolute",
+  },
+  activePage: {
+    position: "relative",
+  },
+});
