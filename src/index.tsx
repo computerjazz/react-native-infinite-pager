@@ -4,7 +4,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { StyleSheet } from "react-native";
+import { StyleProp, StyleSheet, ViewStyle } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useAnimatedGestureHandler,
@@ -35,6 +35,8 @@ type PageComponentType = (props: {
   isActive: boolean;
 }) => JSX.Element | null;
 
+type AnyStyle = StyleProp<ViewStyle> | ReturnType<typeof useAnimatedStyle>;
+
 type Props = {
   PageComponent:
     | PageComponentType
@@ -42,6 +44,8 @@ type Props = {
   pageCallbackNode?: Animated.SharedValue<number>;
   onPageChange?: (page: number) => void;
   pageBuffer?: number; // number of pages to render on either side of active page
+  style?: AnyStyle;
+  pageWrapperStyle?: AnyStyle;
 };
 
 type ImperativeApiOptions = {
@@ -55,7 +59,14 @@ export type InfinitePagerImperativeApi = {
 };
 
 function InfinitePager(
-  { PageComponent, pageCallbackNode, onPageChange, pageBuffer = 1 }: Props,
+  {
+    PageComponent,
+    pageCallbackNode,
+    onPageChange,
+    pageBuffer = 1,
+    style,
+    pageWrapperStyle,
+  }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
   const pageWidth = useSharedValue(0);
@@ -154,6 +165,7 @@ function InfinitePager(
   return (
     <PanGestureHandler onGestureEvent={gestureHandler}>
       <Animated.View
+        style={style}
         onLayout={({ nativeEvent }) =>
           (pageWidth.value = nativeEvent.layout.width)
         }
@@ -167,6 +179,7 @@ function InfinitePager(
               pageWidth={pageWidth}
               isActive={pageIndex === curIndex}
               PageComponent={PageComponent}
+              style={pageWrapperStyle}
             />
           );
         })}
@@ -181,6 +194,7 @@ type PageWrapperProps = {
   pageWidth: Animated.SharedValue<number>;
   PageComponent: PageComponentType;
   isActive: boolean;
+  style?: AnyStyle;
 };
 
 const PageWrapper = React.memo(
@@ -190,6 +204,7 @@ const PageWrapper = React.memo(
     pageWidth,
     PageComponent,
     isActive,
+    style,
   }: PageWrapperProps) => {
     const translation = useDerivedValue(() => {
       const translateX = (index - pageAnim.value) * pageWidth.value;
@@ -214,7 +229,12 @@ const PageWrapper = React.memo(
 
     return (
       <Animated.View
-        style={[styles.pageWrapper, animStyle, isActive && styles.activePage]}
+        style={[
+          style,
+          styles.pageWrapper,
+          animStyle,
+          isActive && styles.activePage,
+        ]}
       >
         <PageComponent
           index={index}

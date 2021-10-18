@@ -9,7 +9,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "typecheck": "tsc --skipLibCheck --noEmit",
-    "build": "bob build"
+    "build": "bob build",
+    "publish-patch": "yarn build && yarn version --patch && npm publish"
   },
   "husky": {
     "hooks": {
