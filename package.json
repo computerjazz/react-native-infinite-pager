@@ -19,7 +19,10 @@
   "keywords": [
     "react",
     "native",
-    "pager"
+    "infinite",
+    "pager",
+    "swipe",
+    "slideshow"
   ],
   "peerDependencies": {
     "react-native": ">=0.62.0",
