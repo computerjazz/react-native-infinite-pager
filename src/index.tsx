@@ -49,7 +49,7 @@ type Props = {
   pageBuffer?: number; // number of pages to render on either side of active page
   style?: AnyStyle;
   pageWrapperStyle?: AnyStyle;
-  pageInterpolator: typeof defaultPageInterpolator;
+  pageInterpolator?: typeof defaultPageInterpolator;
 };
 
 type ImperativeApiOptions = {
