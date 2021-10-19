@@ -3,7 +3,7 @@
 An infinitely-swipeable horizontal pager component.<br />
 Fully native interactions powered by [Reanimated 2](https://github.com/kmagiera/react-native-reanimated) and [React Native Gesture Handler](https://github.com/kmagiera/react-native-gesture-handler)
 
-![InfinitePager demo](https://i.imgur.com/MlkaE8N.gif)
+![InfinitePager demo](https://i.imgur.com/vLiQTAY.gif)
 
 ## Install
 
