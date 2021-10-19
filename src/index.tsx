@@ -52,6 +52,7 @@ type Props = {
   pageInterpolator?: typeof defaultPageInterpolator;
   minIndex?: number;
   maxIndex?: number;
+  simultaneousHandlers?: React.Ref<unknown> | React.Ref<unknown>[];
 };
 
 type ImperativeApiOptions = {
@@ -75,6 +76,7 @@ function InfinitePager(
     pageInterpolator = defaultPageInterpolator,
     minIndex = -Infinity,
     maxIndex = Infinity,
+    simultaneousHandlers,
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -181,7 +183,10 @@ function InfinitePager(
   );
 
   return (
-    <PanGestureHandler onGestureEvent={gestureHandler}>
+    <PanGestureHandler
+      onGestureEvent={gestureHandler}
+      simultaneousHandlers={simultaneousHandlers}
+    >
       <Animated.View
         style={style}
         onLayout={({ nativeEvent }) =>
