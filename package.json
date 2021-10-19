@@ -10,7 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "typecheck": "tsc --skipLibCheck --noEmit",
     "build": "bob build",
-    "publish-patch": "yarn build && yarn version --patch && npm publish"
+    "lint": "eslint --ext .ts,.js,.tsx ."
   },
   "husky": {
     "hooks": {
@@ -31,9 +31,13 @@
     "react-native-reanimated": ">=2.0.0"
   },
   "devDependencies": {
+    "@react-native-community/eslint-config": "^2.0.0",
     "@types/react": "^17.0.5",
     "@types/react-native": "^0.64.5",
+    "@typescript-eslint/eslint-plugin": "^3.4.0",
+    "@typescript-eslint/parser": "^3.4.0",
     "husky": "^4.2.0",
+    "eslint": "^7.3.1",
     "prettier": "^2.2.1",
     "pretty-quick": "^2.0.1",
     "react": "~16.9.0",

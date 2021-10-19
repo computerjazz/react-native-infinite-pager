@@ -13,6 +13,7 @@ import Animated, {
   useDerivedValue,
   useAnimatedReaction,
   runOnJS,
+  interpolate,
 } from "react-native-reanimated";
 import {
   GestureEvent,
@@ -48,6 +49,7 @@ type Props = {
   pageBuffer?: number; // number of pages to render on either side of active page
   style?: AnyStyle;
   pageWrapperStyle?: AnyStyle;
+  pageInterpolator: typeof defaultPageInterpolator;
 };
 
 type ImperativeApiOptions = {
@@ -68,6 +70,7 @@ function InfinitePager(
     pageBuffer = 1,
     style,
     pageWrapperStyle,
+    pageInterpolator = defaultPageInterpolator,
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -76,6 +79,9 @@ function InfinitePager(
   const [curIndex, setCurIndex] = useState(0);
   const pageAnimInternal = useSharedValue(0);
   const pageAnim = pageCallbackNode || pageAnimInternal;
+
+  const pageInterpolatorRef = useRef(pageInterpolator);
+  pageInterpolatorRef.current = pageInterpolator;
 
   const curIndexRef = useRef(curIndex);
   curIndexRef.current = curIndex;
@@ -92,7 +98,7 @@ function InfinitePager(
         translateX.value = updatedTranslateX;
       }
     },
-    []
+    [pageWidth, translateX]
   );
 
   useImperativeHandle(
@@ -182,6 +188,7 @@ function InfinitePager(
               isActive={pageIndex === curIndex}
               PageComponent={PageComponent}
               style={pageWrapperStyle}
+              pageInterpolatorRef={pageInterpolatorRef}
             />
           );
         })}
@@ -197,7 +204,33 @@ type PageWrapperProps = {
   PageComponent: PageComponentType;
   isActive: boolean;
   style?: AnyStyle;
+  pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
 };
+
+export type PageInterpolatorParams = {
+  index: number;
+  focusAnim: Animated.DerivedValue<number>;
+  pageAnim: Animated.DerivedValue<number>;
+  pageWidth: Animated.SharedValue<number>;
+};
+
+function defaultPageInterpolator({
+  focusAnim,
+  pageWidth,
+}: PageInterpolatorParams): ReturnType<typeof useAnimatedStyle> {
+  "worklet";
+  return {
+    transform: [
+      {
+        translateX: interpolate(
+          focusAnim.value,
+          [-1, 0, 1],
+          [-pageWidth.value, 0, pageWidth.value]
+        ),
+      },
+    ],
+  };
+}
 
 const PageWrapper = React.memo(
   ({
@@ -207,25 +240,26 @@ const PageWrapper = React.memo(
     PageComponent,
     isActive,
     style,
+    pageInterpolatorRef,
   }: PageWrapperProps) => {
     const translation = useDerivedValue(() => {
       const translateX = (index - pageAnim.value) * pageWidth.value;
       return translateX;
     }, []);
 
-    const zeroFocusAnim = useDerivedValue(() => {
+    const focusAnim = useDerivedValue(() => {
+      if (!pageWidth.value) return 99999;
       return translation.value / pageWidth.value;
     }, []);
 
     const animStyle = useAnimatedStyle(() => {
-      const hasInitialized = pageWidth.value > 0;
-      const isFullOpacity = hasInitialized || isActive;
-      const opacity = isFullOpacity ? 1 : 0;
-      return {
-        opacity,
-        transform: [{ translateX: translation.value }],
-      };
-    }, [pageWidth, pageAnim, index, translation, isActive]);
+      return pageInterpolatorRef.current({
+        focusAnim,
+        pageAnim,
+        pageWidth,
+        index,
+      });
+    }, [pageWidth, pageAnim, index, translation]);
 
     return (
       <Animated.View
@@ -239,7 +273,7 @@ const PageWrapper = React.memo(
         <PageComponent
           index={index}
           isActive={isActive}
-          focusAnim={zeroFocusAnim}
+          focusAnim={focusAnim}
           pageWidthAnim={pageWidth}
           pageAnim={pageAnim}
         />
