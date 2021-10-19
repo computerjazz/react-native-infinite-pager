@@ -50,6 +50,8 @@ type Props = {
   style?: AnyStyle;
   pageWrapperStyle?: AnyStyle;
   pageInterpolator?: typeof defaultPageInterpolator;
+  minIndex?: number;
+  maxIndex?: number;
 };
 
 type ImperativeApiOptions = {
@@ -71,6 +73,8 @@ function InfinitePager(
     style,
     pageWrapperStyle,
     pageInterpolator = defaultPageInterpolator,
+    minIndex = -Infinity,
+    maxIndex = Infinity,
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -152,22 +156,28 @@ function InfinitePager(
         ctx.startX = translateX.value;
       },
       onActive: (event, ctx) => {
-        translateX.value = ctx.startX + event.translationX;
+        const rawVal = ctx.startX + event.translationX;
+        const page = -rawVal / pageWidth.value;
+        if (page >= minIndex && page <= maxIndex) {
+          translateX.value = rawVal;
+        }
       },
       onEnd: (evt) => {
         const isFling = Math.abs(evt.velocityX) > 500;
         let velocityModifier = isFling ? pageWidth.value / 2 : 0;
         if (evt.velocityX < 0) velocityModifier *= -1;
-        const page = Math.round(
-          (translateX.value + velocityModifier) / pageWidth.value
-        );
+        let page =
+          -1 *
+          Math.round((translateX.value + velocityModifier) / pageWidth.value);
+        if (page < minIndex) page = minIndex;
+        if (page > maxIndex) page = maxIndex;
         translateX.value = withSpring(
-          page * pageWidth.value,
+          -page * pageWidth.value,
           DEFAULT_ANIMATION_CONFIG
         );
       },
     },
-    []
+    [minIndex, maxIndex]
   );
 
   return (
