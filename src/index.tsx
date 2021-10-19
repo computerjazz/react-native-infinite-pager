@@ -33,6 +33,8 @@ type PageComponentType = (props: {
   index: number;
   focusAnim: Animated.DerivedValue<number>;
   isActive: boolean;
+  pageWidthAnim: Animated.SharedValue<number>;
+  pageAnim: Animated.SharedValue<number>;
 }) => JSX.Element | null;
 
 type AnyStyle = StyleProp<ViewStyle> | ReturnType<typeof useAnimatedStyle>;
@@ -211,10 +213,8 @@ const PageWrapper = React.memo(
       return translateX;
     }, []);
 
-    const focusAnim = useDerivedValue(() => {
-      const zeroFocused = Math.abs(translation.value) / pageWidth.value;
-      const oneFocused = (zeroFocused - 1) * -1;
-      return oneFocused;
+    const zeroFocusAnim = useDerivedValue(() => {
+      return translation.value / pageWidth.value;
     }, []);
 
     const animStyle = useAnimatedStyle(() => {
@@ -239,7 +239,9 @@ const PageWrapper = React.memo(
         <PageComponent
           index={index}
           isActive={isActive}
-          focusAnim={focusAnim}
+          focusAnim={zeroFocusAnim}
+          pageWidthAnim={pageWidth}
+          pageAnim={pageAnim}
         />
       </Animated.View>
     );
