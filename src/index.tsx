@@ -54,7 +54,7 @@ type Props = {
   maxIndex?: number;
   simultaneousHandlers?: React.Ref<unknown> | React.Ref<unknown>[];
   gesturesDisabled?: boolean;
-  animationConfig: Partial<Animated.WithSpringConfig>;
+  animationConfig?: Partial<Animated.WithSpringConfig>;
 };
 
 type ImperativeApiOptions = {
