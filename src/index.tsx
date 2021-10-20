@@ -53,6 +53,7 @@ type Props = {
   minIndex?: number;
   maxIndex?: number;
   simultaneousHandlers?: React.Ref<unknown> | React.Ref<unknown>[];
+  gesturesDisabled?: boolean;
 };
 
 type ImperativeApiOptions = {
@@ -77,6 +78,7 @@ function InfinitePager(
     minIndex = -Infinity,
     maxIndex = Infinity,
     simultaneousHandlers,
+    gesturesDisabled,
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -184,6 +186,7 @@ function InfinitePager(
 
   return (
     <PanGestureHandler
+      enabled={!gesturesDisabled}
       onGestureEvent={gestureHandler}
       simultaneousHandlers={simultaneousHandlers}
     >
