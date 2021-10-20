@@ -54,6 +54,7 @@ type Props = {
   maxIndex?: number;
   simultaneousHandlers?: React.Ref<unknown> | React.Ref<unknown>[];
   gesturesDisabled?: boolean;
+  animationConfig: Partial<Animated.WithSpringConfig>;
 };
 
 type ImperativeApiOptions = {
@@ -79,6 +80,7 @@ function InfinitePager(
     maxIndex = Infinity,
     simultaneousHandlers,
     gesturesDisabled,
+    animationConfig = {},
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -94,14 +96,19 @@ function InfinitePager(
   const curIndexRef = useRef(curIndex);
   curIndexRef.current = curIndex;
 
+  const animCfgRef = useRef(animationConfig);
+  animCfgRef.current = animationConfig;
+
   const setPage = useCallback(
     (index: number, options: ImperativeApiOptions = {}) => {
       const updatedTranslateX = index * pageWidth.value * -1;
       if (options.animated) {
-        translateX.value = withSpring(
-          updatedTranslateX,
-          DEFAULT_ANIMATION_CONFIG
-        );
+        const animCfg = {
+          ...DEFAULT_ANIMATION_CONFIG,
+          ...animCfgRef.current,
+        };
+
+        translateX.value = withSpring(updatedTranslateX, animCfg);
       } else {
         translateX.value = updatedTranslateX;
       }
@@ -175,10 +182,14 @@ function InfinitePager(
           Math.round((translateX.value + velocityModifier) / pageWidth.value);
         if (page < minIndex) page = minIndex;
         if (page > maxIndex) page = maxIndex;
-        translateX.value = withSpring(
-          -page * pageWidth.value,
-          DEFAULT_ANIMATION_CONFIG
+
+        const animCfg = Object.assign(
+          {},
+          DEFAULT_ANIMATION_CONFIG,
+          animCfgRef.current
         );
+
+        translateX.value = withSpring(-page * pageWidth.value, animCfg);
       },
     },
     [minIndex, maxIndex]
