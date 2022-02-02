@@ -1,6 +1,6 @@
 {
   "name": "react-native-infinite-pager",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "A pager component that renders pages dynamically. Powered by reanimated.",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
@@ -17,7 +17,7 @@
       "pre-commit": "pretty-quick --staged"
     }
   },
-    "repository": {
+  "repository": {
     "type": "git",
     "url": "git+https://github.com/computerjazz/react-native-infinite-pager.git"
   },
