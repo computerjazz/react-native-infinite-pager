@@ -282,6 +282,9 @@ const PageWrapper = React.memo(
     }, []);
 
     const animStyle = useAnimatedStyle(() => {
+      // Short circuit page interpolation to prevent buggy initial values due to possible race condition:
+      // https://github.com/software-mansion/react-native-reanimated/issues/2571
+      if (!pageWidth.value) return {};
       return pageInterpolatorRef.current({
         focusAnim,
         pageAnim,
