@@ -14,21 +14,55 @@ Fully native interactions powered by [Reanimated 2](https://github.com/kmagiera/
 ### Props
 
 ```typescript
-type PageComponentType = (props: {
+type PageProps = {
   index: number;
   focusAnim: Animated.DerivedValue<number>;
   isActive: boolean;
-}) => JSX.Element | null;
+  pageWidthAnim: Animated.SharedValue<number>;
+  pageAnim: Animated.SharedValue<number>;
+}
+
+type PageComponentType = (props: PageProps) => JSX.Element | null;
 
 type AnyStyle = StyleProp<ViewStyle> | ReturnType<typeof useAnimatedStyle>;
+
+type Props = {
+  PageComponent?:
+    | PageComponentType
+    | React.MemoExoticComponent<PageComponentType>;
+  renderPage?: PageComponentType
+  pageCallbackNode?: Animated.SharedValue<number>;
+  onPageChange?: (page: number) => void;
+  pageBuffer?: number; 
+  style?: AnyStyle;
+  pageWrapperStyle?: AnyStyle;
+  pageInterpolator?: typeof defaultPageInterpolator;
+  minIndex?: number;
+  maxIndex?: number;
+  simultaneousGestures?: (ComposedGesture | GestureType)[];
+  gesturesDisabled?: boolean;
+  animationConfig?: Partial<WithSpringConfig>;
+};
 ```
 
 | Name               | Type                     | Description                                     |
 | :----------------- | :----------------------- | :---------------------------------------------- |
-| `PageComponent`    | `PageComponentType`      | Component to be rendered as each page.          |
+| `PageComponent`    | `PageComponentType`      | Component to be rendered as each page (either PageComponent OR renderPage must be defined, but not both — choose the version that suits your use case).          |
+| `renderPage`    | `PageComponentType`      | Function to be called to render each page.          |
 | `onPageChange`     | `(page: number) => void` | Callback invoked when the current page changes. |
 | `style`            | `AnyStyle`               | Style of the pager container.                   |
 | `pageWrapperStyle` | `AnyStyle`               | Style of the container that wraps each page.    |
+| `pageCallbackNode` | `Animated.SharedValue<number>`               | SharedValue that represents the index of the current page.    |
+| `pageBuffer` | `number`               | Number of pages to render on either side of the active page.    |
+| `pageInterpolator` | `(params: PageInterpolatorParams) => ReturnType<typeof useAnimatedStyle>`               | Interpolator for custom page animations.    |
+| `minIndex`            | `number`               | Minimum page index for non-infinite behavior (optional).                   |
+| `maxIndex`            | `number`               | Maximum page index for non-infinite behavior (optional).                   |
+| `simultaneousGestures`            | `(ComposedGesture | GestureType)[]`               | Simultaneous RNGH gestures.                   |
+| `gesturesDisabled`            | `boolean`               | Disables pan gestures.                   |
+| `animationConfig`            | `Partial<WithSpringConfig>`               | Customizes paging animations.                   |
+
+
+
 
 ### Imperative Api
 

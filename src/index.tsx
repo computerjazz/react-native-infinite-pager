@@ -31,20 +31,22 @@ export const DEFAULT_ANIMATION_CONFIG: WithSpringConfig = {
   restDisplacementThreshold: 0.2,
 };
 
-type PageComponentType = (props: {
+type PageProps = {
   index: number;
   focusAnim: Animated.DerivedValue<number>;
   isActive: boolean;
   pageWidthAnim: Animated.SharedValue<number>;
   pageAnim: Animated.SharedValue<number>;
-}) => JSX.Element | null;
+};
+type PageComponentType = (props: PageProps) => JSX.Element | null;
 
 type AnyStyle = StyleProp<ViewStyle> | ReturnType<typeof useAnimatedStyle>;
 
 type Props = {
-  PageComponent:
+  PageComponent?:
     | PageComponentType
     | React.MemoExoticComponent<PageComponentType>;
+  renderPage?: PageComponentType;
   pageCallbackNode?: Animated.SharedValue<number>;
   onPageChange?: (page: number) => void;
   pageBuffer?: number; // number of pages to render on either side of active page
@@ -82,6 +84,7 @@ function InfinitePager(
     simultaneousGestures = [],
     gesturesDisabled,
     animationConfig = {},
+    renderPage,
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -211,6 +214,7 @@ function InfinitePager(
               pageWidth={pageWidth}
               isActive={pageIndex === curIndex}
               PageComponent={PageComponent}
+              renderPage={renderPage}
               style={pageWrapperStyle}
               pageInterpolatorRef={pageInterpolatorRef}
             />
@@ -225,7 +229,8 @@ type PageWrapperProps = {
   pageAnim: Animated.SharedValue<number>;
   index: number;
   pageWidth: Animated.SharedValue<number>;
-  PageComponent: PageComponentType;
+  PageComponent?: PageComponentType;
+  renderPage?: PageComponentType;
   isActive: boolean;
   style?: AnyStyle;
   pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
@@ -262,6 +267,7 @@ const PageWrapper = React.memo(
     pageAnim,
     pageWidth,
     PageComponent,
+    renderPage,
     isActive,
     style,
     pageInterpolatorRef,
@@ -289,6 +295,16 @@ const PageWrapper = React.memo(
       });
     }, [pageWidth, pageAnim, index, translation]);
 
+    if (PageComponent && renderPage) {
+      console.warn(
+        "PageComponent and renderPage both defined, defaulting to PageComponent"
+      );
+    }
+
+    if (!PageComponent && !renderPage) {
+      throw new Error("Either PageComponent or renderPage must be defined.");
+    }
+
     return (
       <Animated.View
         style={[
@@ -298,13 +314,23 @@ const PageWrapper = React.memo(
           isActive && styles.activePage,
         ]}
       >
-        <PageComponent
-          index={index}
-          isActive={isActive}
-          focusAnim={focusAnim}
-          pageWidthAnim={pageWidth}
-          pageAnim={pageAnim}
-        />
+        {PageComponent ? (
+          <PageComponent
+            index={index}
+            isActive={isActive}
+            focusAnim={focusAnim}
+            pageWidthAnim={pageWidth}
+            pageAnim={pageAnim}
+          />
+        ) : (
+          renderPage?.({
+            index,
+            isActive,
+            focusAnim,
+            pageWidthAnim: pageWidth,
+            pageAnim,
+          })
+        )}
       </Animated.View>
     );
   }
