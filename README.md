@@ -57,7 +57,7 @@ type Props = {
 | `pageInterpolator` | `(params: PageInterpolatorParams) => ReturnType<typeof useAnimatedStyle>`               | Interpolator for custom page animations.    |
 | `minIndex`            | `number`               | Minimum page index for non-infinite behavior (optional).                   |
 | `maxIndex`            | `number`               | Maximum page index for non-infinite behavior (optional).                   |
-| `simultaneousGestures`            | `(ComposedGesture | GestureType)[]`               | Simultaneous RNGH gestures.                   |
+| `simultaneousGestures`            | `(ComposedGesture \| GestureType)[]`               | Simultaneous RNGH gestures.                   |
 | `gesturesDisabled`            | `boolean`               | Disables pan gestures.                   |
 | `animationConfig`            | `Partial<WithSpringConfig>`               | Customizes paging animations.                   |
 
