@@ -60,6 +60,8 @@ type Props = {
 | `simultaneousGestures`            | `(ComposedGesture \| GestureType)[]`               | Simultaneous RNGH gestures.                   |
 | `gesturesDisabled`            | `boolean`               | Disables pan gestures.                   |
 | `animationConfig`            | `Partial<WithSpringConfig>`               | Customizes paging animations.                   |
+| `vertical`            | `boolean`               | Sets page gesture to the vertical axis.                   |
+| `flingVelocity`            | `number`               | Determines sensitivity of a page-turning "fling" at the end of the gesture.                   |
 
 
 
