@@ -42,6 +42,8 @@ type Props = {
   simultaneousGestures?: (ComposedGesture | GestureType)[];
   gesturesDisabled?: boolean;
   animationConfig?: Partial<WithSpringConfig>;
+  vertical?: boolean;
+  flingVelocity?: number;
 };
 ```
 
