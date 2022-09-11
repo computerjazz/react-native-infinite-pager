@@ -12,7 +12,6 @@ import Animated, {
   useDerivedValue,
   useAnimatedReaction,
   runOnJS,
-  interpolate,
   WithSpringConfig,
 } from "react-native-reanimated";
 import {
@@ -21,6 +20,7 @@ import {
   GestureDetector,
   GestureType,
 } from "react-native-gesture-handler";
+import { defaultPageInterpolator } from "./pageInterpolators";
 
 export const DEFAULT_ANIMATION_CONFIG: WithSpringConfig = {
   damping: 20,
@@ -262,34 +262,6 @@ export type PageInterpolatorParams = {
   pageWidth: Animated.SharedValue<number>;
   pageHeight: Animated.SharedValue<number>;
 };
-
-function defaultPageInterpolator({
-  focusAnim,
-  pageWidth,
-  pageHeight,
-  vertical,
-}: PageInterpolatorParams): ReturnType<typeof useAnimatedStyle> {
-  "worklet";
-
-  const translateX = vertical
-    ? 0
-    : interpolate(
-        focusAnim.value,
-        [-1, 0, 1],
-        [-pageWidth.value, 0, pageWidth.value]
-      );
-  const translateY = vertical
-    ? interpolate(
-        focusAnim.value,
-        [-1, 0, 1],
-        [-pageHeight.value, 0, pageHeight.value]
-      )
-    : 0;
-
-  return {
-    transform: [{ translateX }, { translateY }],
-  };
-}
 
 const PageWrapper = React.memo(
   ({
