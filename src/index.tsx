@@ -60,6 +60,7 @@ type Props = {
   simultaneousGestures?: (ComposedGesture | GestureType)[];
   gesturesDisabled?: boolean;
   animationConfig?: Partial<WithSpringConfig>;
+  flingVelocity?: number;
 };
 
 type ImperativeApiOptions = {
@@ -88,6 +89,7 @@ function InfinitePager(
     gesturesDisabled,
     animationConfig = {},
     renderPage,
+    flingVelocity = 500,
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -188,7 +190,7 @@ function InfinitePager(
     })
     .onEnd((evt) => {
       const evtVelocity = vertical ? evt.velocityY : evt.velocityX;
-      const isFling = Math.abs(evtVelocity) > 500;
+      const isFling = Math.abs(evtVelocity) > flingVelocity;
       let velocityModifier = isFling ? pageSize.value / 2 : 0;
       if (evtVelocity < 0) velocityModifier *= -1;
       let page =
