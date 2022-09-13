@@ -44,6 +44,7 @@ type Props = {
   animationConfig?: Partial<WithSpringConfig>;
   vertical?: boolean;
   flingVelocity?: number;
+  preset?: Preset;
 };
 ```
 
@@ -64,8 +65,7 @@ type Props = {
 | `animationConfig`            | `Partial<WithSpringConfig>`               | Customizes paging animations.                   |
 | `vertical`            | `boolean`               | Sets page gesture to the vertical axis.                   |
 | `flingVelocity`            | `number`               | Determines sensitivity of a page-turning "fling" at the end of the gesture.                   |
-
-
+| `preset`            | `Preset`               | Uses a pre-configured page interpolator.                   |
 
 
 ### Imperative Api

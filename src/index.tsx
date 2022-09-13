@@ -32,7 +32,7 @@ export enum Preset {
   SLIDE = "slide",
   CUBE = "cube",
   STACK = "stack",
-  TURN_IN = "turnIn",
+  TURN_IN = "turn-in",
 }
 
 const PageInterpolators = {
