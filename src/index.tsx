@@ -20,7 +20,27 @@ import {
   GestureDetector,
   GestureType,
 } from "react-native-gesture-handler";
-import { defaultPageInterpolator } from "./pageInterpolators";
+import {
+  defaultPageInterpolator,
+  pageInterpolatorCube,
+  pageInterpolatorSlide,
+  pageInterpolatorStack,
+  pageInterpolatorTurnIn,
+} from "./pageInterpolators";
+
+export enum Preset {
+  SLIDE = "slide",
+  CUBE = "cube",
+  STACK = "stack",
+  TURN_IN = "turnIn",
+}
+
+const PageInterpolators = {
+  [Preset.SLIDE]: pageInterpolatorSlide,
+  [Preset.CUBE]: pageInterpolatorCube,
+  [Preset.STACK]: pageInterpolatorStack,
+  [Preset.TURN_IN]: pageInterpolatorTurnIn,
+};
 
 export const DEFAULT_ANIMATION_CONFIG: WithSpringConfig = {
   damping: 20,
@@ -61,6 +81,7 @@ type Props = {
   gesturesDisabled?: boolean;
   animationConfig?: Partial<WithSpringConfig>;
   flingVelocity?: number;
+  preset?: Preset;
 };
 
 type ImperativeApiOptions = {
@@ -82,7 +103,6 @@ function InfinitePager(
     pageBuffer = 1,
     style,
     pageWrapperStyle,
-    pageInterpolator = defaultPageInterpolator,
     minIndex = -Infinity,
     maxIndex = Infinity,
     simultaneousGestures = [],
@@ -90,6 +110,8 @@ function InfinitePager(
     animationConfig = {},
     renderPage,
     flingVelocity = 500,
+    preset = Preset.SLIDE,
+    pageInterpolator = PageInterpolators[preset],
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -233,6 +255,7 @@ function InfinitePager(
               renderPage={renderPage}
               style={pageWrapperStyle}
               pageInterpolatorRef={pageInterpolatorRef}
+              pageBuffer={pageBuffer}
             />
           );
         })}
@@ -252,6 +275,7 @@ type PageWrapperProps = {
   isActive: boolean;
   style?: AnyStyle;
   pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
+  pageBuffer: number;
 };
 
 export type PageInterpolatorParams = {
@@ -261,6 +285,7 @@ export type PageInterpolatorParams = {
   pageAnim: Animated.DerivedValue<number>;
   pageWidth: Animated.SharedValue<number>;
   pageHeight: Animated.SharedValue<number>;
+  pageBuffer: number;
 };
 
 const PageWrapper = React.memo(
@@ -275,6 +300,7 @@ const PageWrapper = React.memo(
     isActive,
     style,
     pageInterpolatorRef,
+    pageBuffer,
   }: PageWrapperProps) => {
     const pageSize = vertical ? pageHeight : pageWidth;
 
@@ -301,8 +327,17 @@ const PageWrapper = React.memo(
         pageHeight: _pageHeight,
         index,
         vertical,
+        pageBuffer,
       });
-    }, [pageWidth, pageHeight, pageAnim, index, translation, vertical]);
+    }, [
+      pageWidth,
+      pageHeight,
+      pageAnim,
+      index,
+      translation,
+      vertical,
+      pageBuffer,
+    ]);
 
     if (PageComponent && renderPage) {
       console.warn(
