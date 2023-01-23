@@ -55,6 +55,7 @@ type PageProps = {
   index: number;
   focusAnim: Animated.DerivedValue<number>;
   isActive: boolean;
+  isAdjacentToActive: boolean;
   pageWidthAnim: Animated.SharedValue<number>;
   pageHeightAnim: Animated.SharedValue<number>;
   pageAnim: Animated.SharedValue<number>;
@@ -72,6 +73,7 @@ type Props = {
   pageCallbackNode?: Animated.SharedValue<number>;
   onPageChange?: (page: number) => void;
   pageBuffer?: number; // number of pages to render on either side of active page
+  updatePagesInBuffer?: number; // number of pages to re-render on either side of active page after transition
   style?: AnyStyle;
   pageWrapperStyle?: AnyStyle;
   pageInterpolator?: typeof defaultPageInterpolator;
@@ -89,6 +91,7 @@ type ImperativeApiOptions = {
 };
 
 export type InfinitePagerImperativeApi = {
+  getCurrentPage: () => number;
   setPage: (index: number, options: ImperativeApiOptions) => void;
   incrementPage: (options: ImperativeApiOptions) => void;
   decrementPage: (options: ImperativeApiOptions) => void;
@@ -101,6 +104,7 @@ function InfinitePager(
     pageCallbackNode,
     onPageChange,
     pageBuffer = 1,
+    updatePagesInBuffer,
     style,
     pageWrapperStyle,
     minIndex = -Infinity,
@@ -156,6 +160,7 @@ function InfinitePager(
   useImperativeHandle(
     ref,
     () => ({
+      getCurrentPage: () => curIndexRef.current,
       setPage,
       incrementPage: (options?: ImperativeApiOptions) => {
         setPage(curIndexRef.current + 1, options);
@@ -251,6 +256,11 @@ function InfinitePager(
               pageWidth={pageWidth}
               pageHeight={pageHeight}
               isActive={pageIndex === curIndex}
+              isAdjacentToActive={
+                updatePagesInBuffer
+                  ? Math.abs(pageIndex - curIndex) <= updatePagesInBuffer
+                  : false
+              }
               PageComponent={PageComponent}
               renderPage={renderPage}
               style={pageWrapperStyle}
@@ -273,6 +283,7 @@ type PageWrapperProps = {
   PageComponent?: PageComponentType;
   renderPage?: PageComponentType;
   isActive: boolean;
+  isAdjacentToActive: boolean;
   style?: AnyStyle;
   pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
   pageBuffer: number;
@@ -298,6 +309,7 @@ const PageWrapper = React.memo(
     PageComponent,
     renderPage,
     isActive,
+    isAdjacentToActive,
     style,
     pageInterpolatorRef,
     pageBuffer,
@@ -362,6 +374,7 @@ const PageWrapper = React.memo(
           <PageComponent
             index={index}
             isActive={isActive}
+            isAdjacentToActive={isAdjacentToActive}
             focusAnim={focusAnim}
             pageWidthAnim={pageWidth}
             pageHeightAnim={pageHeight}
@@ -371,6 +384,7 @@ const PageWrapper = React.memo(
           renderPage?.({
             index,
             isActive,
+            isAdjacentToActive,
             focusAnim,
             pageWidthAnim: pageWidth,
             pageHeightAnim: pageHeight,
