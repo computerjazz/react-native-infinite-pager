@@ -82,6 +82,7 @@ type Props = {
   animationConfig?: Partial<WithSpringConfig>;
   flingVelocity?: number;
   preset?: Preset;
+  bouncePct?: number;
 };
 
 type ImperativeApiOptions = {
@@ -112,6 +113,7 @@ function InfinitePager(
     flingVelocity = 500,
     preset = Preset.SLIDE,
     pageInterpolator = PageInterpolators[preset],
+    bouncePct = 0.15,
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -208,6 +210,10 @@ function InfinitePager(
       const page = -rawVal / pageSize.value;
       if (page >= minIndex && page <= maxIndex) {
         translate.value = rawVal;
+      } else {
+        const pageTrans = rawVal % pageSize.value;
+        const bounceTrans = pageTrans * (1 - bouncePct);
+        translate.value = rawVal - bounceTrans;
       }
     })
     .onEnd((evt) => {
