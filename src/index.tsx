@@ -3,6 +3,8 @@ import React, {
   useImperativeHandle,
   useCallback,
   useRef,
+  useContext,
+  useMemo,
 } from "react";
 import { StyleProp, StyleSheet, ViewStyle } from "react-native";
 import Animated, {
@@ -126,6 +128,7 @@ function InfinitePager(
   const translate = vertical ? translateY : translateX;
 
   const [curIndex, setCurIndex] = useState(0);
+
   const pageAnimInternal = useSharedValue(0);
   const pageAnim = pageCallbackNode || pageAnimInternal;
 
@@ -199,7 +202,9 @@ function InfinitePager(
 
   const startTranslate = useSharedValue(0);
 
-  const panGesture = Gesture.Pan()
+  const panGesture = useMemo(() => Gesture.Pan(), []);
+
+  panGesture
     .onBegin(() => {
       startTranslate.value = translate.value;
     })
@@ -231,42 +236,47 @@ function InfinitePager(
         DEFAULT_ANIMATION_CONFIG,
         animCfgRef.current
       );
-
       translate.value = withSpring(-page * pageSize.value, animCfg);
     })
     .enabled(!gesturesDisabled);
 
+  const parentGestures = useContext(InfinitePagerContext);
+  const allGestures = useMemo(
+    () => [panGesture, ...parentGestures, ...simultaneousGestures],
+    [panGesture, parentGestures, simultaneousGestures]
+  );
+
   return (
-    <GestureDetector
-      gesture={Gesture.Simultaneous(panGesture, ...simultaneousGestures)}
-    >
-      <Animated.View
-        style={style}
-        onLayout={({ nativeEvent: { layout } }) => {
-          pageWidth.value = layout.width;
-          pageHeight.value = layout.height;
-        }}
-      >
-        {pageIndices.map((pageIndex) => {
-          return (
-            <PageWrapper
-              key={`page-provider-wrapper-${pageIndex}`}
-              vertical={vertical}
-              pageAnim={pageAnim}
-              index={pageIndex}
-              pageWidth={pageWidth}
-              pageHeight={pageHeight}
-              isActive={pageIndex === curIndex}
-              PageComponent={PageComponent}
-              renderPage={renderPage}
-              style={pageWrapperStyle}
-              pageInterpolatorRef={pageInterpolatorRef}
-              pageBuffer={pageBuffer}
-            />
-          );
-        })}
-      </Animated.View>
-    </GestureDetector>
+    <InfinitePagerProvider simultaneousGestures={allGestures}>
+      <GestureDetector gesture={Gesture.Simultaneous(...allGestures)}>
+        <Animated.View
+          style={style}
+          onLayout={({ nativeEvent: { layout } }) => {
+            pageWidth.value = layout.width;
+            pageHeight.value = layout.height;
+          }}
+        >
+          {pageIndices.map((pageIndex) => {
+            return (
+              <PageWrapper
+                key={`page-provider-wrapper-${pageIndex}`}
+                vertical={vertical}
+                pageAnim={pageAnim}
+                index={pageIndex}
+                pageWidth={pageWidth}
+                pageHeight={pageHeight}
+                isActive={pageIndex === curIndex}
+                PageComponent={PageComponent}
+                renderPage={renderPage}
+                style={pageWrapperStyle}
+                pageInterpolatorRef={pageInterpolatorRef}
+                pageBuffer={pageBuffer}
+              />
+            );
+          })}
+        </Animated.View>
+      </GestureDetector>
+    </InfinitePagerProvider>
   );
 }
 
@@ -402,3 +412,21 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 });
+
+type SimultaneousGesture = ComposedGesture | GestureType;
+
+const InfinitePagerContext = React.createContext([] as SimultaneousGesture[]);
+
+function InfinitePagerProvider({
+  simultaneousGestures = [],
+  children,
+}: {
+  simultaneousGestures: SimultaneousGesture[];
+  children: React.ReactNode;
+}) {
+  return (
+    <InfinitePagerContext.Provider value={simultaneousGestures}>
+      {children}
+    </InfinitePagerContext.Provider>
+  );
+}
