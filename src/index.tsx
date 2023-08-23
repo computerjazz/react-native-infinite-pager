@@ -53,7 +53,7 @@ export const DEFAULT_ANIMATION_CONFIG: WithSpringConfig = {
   restDisplacementThreshold: 0.2,
 };
 
-type PageProps = {
+export type InfinitePagerPageProps = {
   index: number;
   focusAnim: Animated.DerivedValue<number>;
   isActive: boolean;
@@ -61,16 +61,18 @@ type PageProps = {
   pageHeightAnim: Animated.SharedValue<number>;
   pageAnim: Animated.SharedValue<number>;
 };
-type PageComponentType = (props: PageProps) => JSX.Element | null;
+export type InfinitePagerPageComponent = (
+  props: InfinitePagerPageProps
+) => JSX.Element | null;
 
 type AnyStyle = StyleProp<ViewStyle> | ReturnType<typeof useAnimatedStyle>;
 
 type Props = {
   vertical?: boolean;
   PageComponent?:
-    | PageComponentType
-    | React.MemoExoticComponent<PageComponentType>;
-  renderPage?: PageComponentType;
+    | InfinitePagerPageComponent
+    | React.MemoExoticComponent<InfinitePagerPageComponent>;
+  renderPage?: InfinitePagerPageComponent;
   pageCallbackNode?: Animated.SharedValue<number>;
   onPageChange?: (page: number) => void;
   pageBuffer?: number; // number of pages to render on either side of active page
@@ -286,8 +288,8 @@ type PageWrapperProps = {
   index: number;
   pageWidth: Animated.SharedValue<number>;
   pageHeight: Animated.SharedValue<number>;
-  PageComponent?: PageComponentType;
-  renderPage?: PageComponentType;
+  PageComponent?: InfinitePagerPageComponent;
+  renderPage?: InfinitePagerPageComponent;
   isActive: boolean;
   style?: AnyStyle;
   pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
