@@ -271,36 +271,20 @@ function InfinitePager(
       const mainTouch = evt.changedTouches[0];
 
       const evtVal = mainTouch[vertical ? "y" : "x"];
-      const crossAxisVal = mainTouch[vertical ? "x" : "y"];
-
       const initTouch = vertical ? initTouchY.value : initTouchX.value;
-      const initCrossAxis = vertical ? initTouchX.value : initTouchY.value;
 
       const evtTranslate = evtVal - initTouch;
-      const crossAxisTranslate = crossAxisVal - initCrossAxis;
-
-      const hasSwipedPastThreshold = Math.abs(crossAxisTranslate) > 10;
 
       const swipingPastEnd =
         (isMinIndex.value && evtTranslate > 0) ||
         (isMaxIndex.value && evtTranslate < 0);
 
-      const swipingCrossAxis =
-        hasSwipedPastThreshold &&
-        Math.abs(crossAxisTranslate) > Math.abs(evtTranslate);
-
-      const shouldFailSelf = swipingPastEnd;
+      const shouldFailSelf = !bouncePct && swipingPastEnd;
 
       if (shouldFailSelf) {
         if (debugTag) {
-          const failReason = swipingCrossAxis
-            ? "xaxis"
-            : swipingPastEnd
-            ? "range"
-            : "locked";
-          const failDetails = swipingCrossAxis
-            ? `${Math.abs(crossAxisTranslate)} > ${Math.abs(evtTranslate)}`
-            : swipingPastEnd
+          const failReason = swipingPastEnd ? "range" : "locked";
+          const failDetails = swipingPastEnd
             ? `${isMinIndex.value ? "min" : "max"}, ${evtTranslate}`
             : "";
           console.log(`${debugTag}: ${failReason} fail (${failDetails})`, evt);
