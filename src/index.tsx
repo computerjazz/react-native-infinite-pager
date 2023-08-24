@@ -219,18 +219,28 @@ function InfinitePager(
 
   const panGesture = useMemo(() => Gesture.Pan(), []);
 
+  const minIndexAnim = useDerivedValue(() => {
+    return minIndex;
+  }, [minIndex]);
+  const maxIndexAnim = useDerivedValue(() => {
+    return maxIndex;
+  }, [maxIndex]);
+
   const isMinIndex = useDerivedValue(() => {
     return curIndex <= minIndex;
   }, [curIndex, minIndex]);
   const isMaxIndex = useDerivedValue(() => {
     return curIndex >= maxIndex;
   }, [curIndex, maxIndex]);
+
   const isAtEdge = isMinIndex || isMaxIndex;
 
   const initTouchX = useSharedValue(0);
   const initTouchY = useSharedValue(0);
 
   const isGestureLocked = useDerivedValue(() => {
+    // Gesture goes to the most-nested active child of both orientations
+    // All other pagers are locked
     const isDeepestInOrientation = activePagers.value
       .filter((v) => {
         return v.split(":")[0] === orientation;
@@ -311,6 +321,8 @@ function InfinitePager(
     .onUpdate((evt) => {
       "worklet";
 
+      if (isGestureLocked.value) return;
+
       if (debugTag) {
         console.log(
           `${debugTag} onUpdate: ${isGestureLocked.value ? "(locked)" : ""}`,
@@ -318,11 +330,10 @@ function InfinitePager(
         );
       }
 
-      if (isGestureLocked.value) return;
       const evtTranslate = vertical ? evt.translationY : evt.translationX;
       const rawVal = startTranslate.value + evtTranslate;
       const page = -rawVal / pageSize.value;
-      if (page >= minIndex && page <= maxIndex) {
+      if (page >= minIndexAnim.value && page <= maxIndexAnim.value) {
         translate.value = rawVal;
       } else {
         const pageTrans = rawVal % pageSize.value;
@@ -340,8 +351,8 @@ function InfinitePager(
       if (evtVelocity < 0) velocityModifier *= -1;
       let page =
         -1 * Math.round((translate.value + velocityModifier) / pageSize.value);
-      if (page < minIndex) page = minIndex;
-      if (page > maxIndex) page = maxIndex;
+      if (page < minIndexAnim.value) page = minIndexAnim.value;
+      if (page > maxIndexAnim.value) page = maxIndexAnim.value;
 
       const animCfg = Object.assign(
         {},
