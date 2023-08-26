@@ -276,14 +276,19 @@ function InfinitePager(
 
       const evtVal = mainTouch[vertical ? "y" : "x"];
       const initTouch = vertical ? initTouchY.value : initTouchX.value;
-
       const evtTranslate = evtVal - initTouch;
+
+      // const xAxisVal = mainTouch[vertical ? "x" : "y"]
+      // const xAxisInitTouch = vertical ? initTouchY.value : initTouchX.value;
+      // const xAxisTranslate = xAxisVal - xAxisInitTouch
+      // const isSwipingCrossAxis = Math.abs(xAxisTranslate) > 10 && Math.abs(xAxisTranslate) > Math.abs(evtTranslate)
 
       const swipingPastEnd =
         (isMinIndex.value && evtTranslate > 0) ||
         (isMaxIndex.value && evtTranslate < 0);
 
-      const shouldFailSelf = !bouncePct && swipingPastEnd;
+      const shouldFailSelf =
+        (!bouncePct && swipingPastEnd) || isGestureLocked.value;
 
       if (shouldFailSelf) {
         if (debugTag) {
@@ -308,8 +313,14 @@ function InfinitePager(
     })
     .onUpdate((evt) => {
       "worklet";
+      const evtTranslate = vertical ? evt.translationY : evt.translationX;
+      const crossAxisTranslate = vertical ? evt.translationX : evt.translationY;
 
-      if (isGestureLocked.value) return;
+      const isSwipingCrossAxis =
+        Math.abs(crossAxisTranslate) > 10 &&
+        Math.abs(crossAxisTranslate) > Math.abs(evtTranslate);
+
+      if (isGestureLocked.value || isSwipingCrossAxis) return;
 
       if (debugTag) {
         console.log(
@@ -318,7 +329,6 @@ function InfinitePager(
         );
       }
 
-      const evtTranslate = vertical ? evt.translationY : evt.translationX;
       const rawVal = startTranslate.value + evtTranslate;
       const page = -rawVal / pageSize.value;
       if (page >= minIndexAnim.value && page <= maxIndexAnim.value) {
