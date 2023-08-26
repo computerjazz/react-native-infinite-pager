@@ -89,6 +89,8 @@ type Props = {
   preset?: Preset;
   bouncePct?: number;
   debugTag?: string;
+  width?: number;
+  height?: number;
 };
 
 type ImperativeApiOptions = {
@@ -121,13 +123,15 @@ function InfinitePager(
     pageInterpolator = PageInterpolators[preset],
     bouncePct = 0.0,
     debugTag = "",
+    width,
+    height,
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
   const orientation = vertical ? "vertical" : "horizontal";
 
-  const pageWidth = useSharedValue(0);
-  const pageHeight = useSharedValue(0);
+  const pageWidth = useSharedValue(width || 0);
+  const pageHeight = useSharedValue(height || 0);
   const pageSize = vertical ? pageHeight : pageWidth;
 
   const translateX = useSharedValue(0);
@@ -353,12 +357,21 @@ function InfinitePager(
         );
       }
     })
-    .onFinalize(() => {
+    .onFinalize((evt) => {
       "worklet";
       const updatedPagerIds = activePagers.value
         .slice()
         .filter((id) => id !== pagerId);
       activePagers.value = updatedPagerIds;
+
+      if (debugTag) {
+        console.log(
+          `${debugTag}: onFinalize (${
+            isGestureLocked.value ? "locked" : "unlocked"
+          })`,
+          evt
+        );
+      }
     })
     .enabled(!gesturesDisabled);
 
@@ -367,11 +380,18 @@ function InfinitePager(
     [panGesture, parentGestures, simultaneousGestures]
   );
 
+  const wrapperStyle = useMemo(() => {
+    const s: StyleProp<ViewStyle> = {};
+    if (width) s.width = width;
+    if (height) s.height = height;
+    return s;
+  }, [width, height]);
+
   return (
     <InfinitePagerProvider simultaneousGestures={allGestures}>
       <GestureDetector gesture={Gesture.Simultaneous(...allGestures)}>
         <Animated.View
-          style={style}
+          style={[wrapperStyle, style]}
           onLayout={({ nativeEvent: { layout } }) => {
             pageWidth.value = layout.width;
             pageHeight.value = layout.height;
@@ -447,7 +467,9 @@ const PageWrapper = React.memo(
     }, []);
 
     const focusAnim = useDerivedValue(() => {
-      if (!pageSize.value) return 99999;
+      if (!pageSize.value) {
+        return index;
+      }
       return translation.value / pageSize.value;
     }, []);
 
