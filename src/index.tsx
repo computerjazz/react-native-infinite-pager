@@ -91,6 +91,7 @@ type Props = {
   debugTag?: string;
   width?: number;
   height?: number;
+  minDistance?: number;
 };
 
 type ImperativeApiOptions = {
@@ -125,6 +126,7 @@ function InfinitePager(
     debugTag = "",
     width,
     height,
+    minDistance = 0,
   }: Props,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -383,7 +385,8 @@ function InfinitePager(
         );
       }
     })
-    .enabled(!gesturesDisabled);
+    .enabled(!gesturesDisabled)
+    .minDistance(minDistance);
 
   const allGestures = useMemo(
     () => [panGesture, ...parentGestures, ...simultaneousGestures],
