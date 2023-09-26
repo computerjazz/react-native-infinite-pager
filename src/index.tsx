@@ -54,7 +54,7 @@ export const DEFAULT_ANIMATION_CONFIG: WithSpringConfig = {
   restDisplacementThreshold: 0.2,
 };
 
-type InfinitePagerPageProps = {
+export type InfinitePagerPageProps = {
   index: number;
   focusAnim: Animated.DerivedValue<number>;
   isActive: boolean;
@@ -62,13 +62,14 @@ type InfinitePagerPageProps = {
   pageHeightAnim: Animated.SharedValue<number>;
   pageAnim: Animated.SharedValue<number>;
 };
-type InfinitePagerPageComponent = (
+
+export type InfinitePagerPageComponent = (
   props: InfinitePagerPageProps
 ) => JSX.Element | null;
 
 type AnyStyle = StyleProp<ViewStyle> | ReturnType<typeof useAnimatedStyle>;
 
-type Props = {
+export type InfinitePagerProps = {
   vertical?: boolean;
   PageComponent?:
     | InfinitePagerPageComponent
@@ -127,7 +128,7 @@ function InfinitePager(
     width,
     height,
     minDistance = 0,
-  }: Props,
+  }: InfinitePagerProps,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
   const orientation = vertical ? "vertical" : "horizontal";
