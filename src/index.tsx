@@ -129,7 +129,7 @@ function InfinitePager(
     debugTag = "",
     width,
     height,
-    minDistance = 0,
+    minDistance,
   }: InfinitePagerProps,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -388,8 +388,11 @@ function InfinitePager(
         );
       }
     })
-    .enabled(!gesturesDisabled)
-    .minDistance(minDistance);
+    .enabled(!gesturesDisabled);
+
+  if (typeof minDistance === "number") {
+    panGesture.minDistance(minDistance);
+  }
 
   const allGestures = useMemo(
     () => [panGesture, ...parentGestures, ...simultaneousGestures],
