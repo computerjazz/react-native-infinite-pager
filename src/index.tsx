@@ -16,6 +16,8 @@ import Animated, {
   runOnJS,
   WithSpringConfig,
   makeMutable,
+  SharedValue,
+  DerivedValue,
 } from "react-native-reanimated";
 import {
   ComposedGesture,
@@ -56,11 +58,11 @@ export const DEFAULT_ANIMATION_CONFIG: WithSpringConfig = {
 
 export type InfinitePagerPageProps = {
   index: number;
-  focusAnim: Animated.DerivedValue<number>;
+  focusAnim: DerivedValue<number>;
   isActive: boolean;
-  pageWidthAnim: Animated.SharedValue<number>;
-  pageHeightAnim: Animated.SharedValue<number>;
-  pageAnim: Animated.SharedValue<number>;
+  pageWidthAnim: SharedValue<number>;
+  pageHeightAnim: SharedValue<number>;
+  pageAnim: SharedValue<number>;
 };
 
 export type InfinitePagerPageComponent = (
@@ -75,7 +77,7 @@ export type InfinitePagerProps = {
     | InfinitePagerPageComponent
     | React.MemoExoticComponent<InfinitePagerPageComponent>;
   renderPage?: InfinitePagerPageComponent;
-  pageCallbackNode?: Animated.SharedValue<number>;
+  pageCallbackNode?: SharedValue<number>;
   onPageChange?: (page: number) => void;
   pageBuffer?: number; // number of pages to render on either side of active page
   style?: AnyStyle;
@@ -437,10 +439,10 @@ function InfinitePager(
 
 type PageWrapperProps = {
   vertical: boolean;
-  pageAnim: Animated.SharedValue<number>;
+  pageAnim: SharedValue<number>;
   index: number;
-  pageWidth: Animated.SharedValue<number>;
-  pageHeight: Animated.SharedValue<number>;
+  pageWidth: SharedValue<number>;
+  pageHeight: SharedValue<number>;
   PageComponent?: InfinitePagerPageComponent;
   renderPage?: InfinitePagerPageComponent;
   isActive: boolean;
@@ -452,10 +454,10 @@ type PageWrapperProps = {
 export type PageInterpolatorParams = {
   index: number;
   vertical: boolean;
-  focusAnim: Animated.DerivedValue<number>;
-  pageAnim: Animated.DerivedValue<number>;
-  pageWidth: Animated.SharedValue<number>;
-  pageHeight: Animated.SharedValue<number>;
+  focusAnim: DerivedValue<number>;
+  pageAnim: DerivedValue<number>;
+  pageWidth: SharedValue<number>;
+  pageHeight: SharedValue<number>;
   pageBuffer: number;
 };
 
@@ -585,7 +587,7 @@ function InfinitePagerProvider({
 }: {
   registerChildGesture?: (childGesture: SimultaneousGesture) => void;
   simultaneousGestures?: SimultaneousGesture[];
-  gestureLock?: Animated.SharedValue<boolean>;
+  gestureLock?: SharedValue<boolean>;
   children: React.ReactNode;
 }) {
   const { nestingDepth, activePagers } = useContext(InfinitePagerContext);
