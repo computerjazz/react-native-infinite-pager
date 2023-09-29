@@ -3,6 +3,8 @@ import React, {
   useImperativeHandle,
   useCallback,
   useRef,
+  useContext,
+  useMemo,
 } from "react";
 import { StyleProp, StyleSheet, ViewStyle } from "react-native";
 import Animated, {
@@ -13,6 +15,9 @@ import Animated, {
   useAnimatedReaction,
   runOnJS,
   WithSpringConfig,
+  makeMutable,
+  SharedValue,
+  DerivedValue,
 } from "react-native-reanimated";
 import {
   ComposedGesture,
@@ -51,25 +56,28 @@ export const DEFAULT_ANIMATION_CONFIG: WithSpringConfig = {
   restDisplacementThreshold: 0.2,
 };
 
-type PageProps = {
+export type InfinitePagerPageProps = {
   index: number;
-  focusAnim: Animated.DerivedValue<number>;
+  focusAnim: DerivedValue<number>;
   isActive: boolean;
-  pageWidthAnim: Animated.SharedValue<number>;
-  pageHeightAnim: Animated.SharedValue<number>;
-  pageAnim: Animated.SharedValue<number>;
+  pageWidthAnim: SharedValue<number>;
+  pageHeightAnim: SharedValue<number>;
+  pageAnim: SharedValue<number>;
 };
-type PageComponentType = (props: PageProps) => JSX.Element | null;
+
+export type InfinitePagerPageComponent = (
+  props: InfinitePagerPageProps
+) => JSX.Element | null;
 
 type AnyStyle = StyleProp<ViewStyle> | ReturnType<typeof useAnimatedStyle>;
 
-type Props = {
+export type InfinitePagerProps = {
   vertical?: boolean;
   PageComponent?:
-    | PageComponentType
-    | React.MemoExoticComponent<PageComponentType>;
-  renderPage?: PageComponentType;
-  pageCallbackNode?: Animated.SharedValue<number>;
+    | InfinitePagerPageComponent
+    | React.MemoExoticComponent<InfinitePagerPageComponent>;
+  renderPage?: InfinitePagerPageComponent;
+  pageCallbackNode?: SharedValue<number>;
   onPageChange?: (page: number) => void;
   pageBuffer?: number; // number of pages to render on either side of active page
   style?: AnyStyle;
@@ -83,6 +91,10 @@ type Props = {
   flingVelocity?: number;
   preset?: Preset;
   bouncePct?: number;
+  debugTag?: string;
+  width?: number;
+  height?: number;
+  minDistance?: number;
 };
 
 type ImperativeApiOptions = {
@@ -113,12 +125,18 @@ function InfinitePager(
     flingVelocity = 500,
     preset = Preset.SLIDE,
     pageInterpolator = PageInterpolators[preset],
-    bouncePct = 0.15,
-  }: Props,
+    bouncePct = 0.0,
+    debugTag = "",
+    width,
+    height,
+    minDistance,
+  }: InfinitePagerProps,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
-  const pageWidth = useSharedValue(0);
-  const pageHeight = useSharedValue(0);
+  const orientation = vertical ? "vertical" : "horizontal";
+
+  const pageWidth = useSharedValue(width || 0);
+  const pageHeight = useSharedValue(height || 0);
   const pageSize = vertical ? pageHeight : pageWidth;
 
   const translateX = useSharedValue(0);
@@ -126,8 +144,17 @@ function InfinitePager(
   const translate = vertical ? translateY : translateX;
 
   const [curIndex, setCurIndex] = useState(0);
+
   const pageAnimInternal = useSharedValue(0);
   const pageAnim = pageCallbackNode || pageAnimInternal;
+
+  const {
+    simultaneousGestures: parentGestures,
+    activePagers,
+    nestingDepth,
+  } = useContext(InfinitePagerContext);
+
+  const pagerId = `${orientation}:${nestingDepth}`;
 
   const pageInterpolatorRef = useRef(pageInterpolator);
   pageInterpolatorRef.current = pageInterpolator;
@@ -145,7 +172,7 @@ function InfinitePager(
         const animCfg = {
           ...DEFAULT_ANIMATION_CONFIG,
           ...animCfgRef.current,
-        };
+        } as WithSpringConfig;
 
         translate.value = withSpring(updatedTranslate, animCfg);
       } else {
@@ -199,16 +226,117 @@ function InfinitePager(
 
   const startTranslate = useSharedValue(0);
 
-  const panGesture = Gesture.Pan()
-    .onBegin(() => {
+  const panGesture = useMemo(() => Gesture.Pan(), []);
+
+  const minIndexAnim = useDerivedValue(() => {
+    return minIndex;
+  }, [minIndex]);
+  const maxIndexAnim = useDerivedValue(() => {
+    return maxIndex;
+  }, [maxIndex]);
+
+  const isMinIndex = useDerivedValue(() => {
+    return curIndex <= minIndex;
+  }, [curIndex, minIndex]);
+  const isMaxIndex = useDerivedValue(() => {
+    return curIndex >= maxIndex;
+  }, [curIndex, maxIndex]);
+
+  const isAtEdge = isMinIndex || isMaxIndex;
+
+  const initTouchX = useSharedValue(0);
+  const initTouchY = useSharedValue(0);
+
+  const isGestureLocked = useDerivedValue(() => {
+    // Gesture goes to the most-nested active child of both orientations
+    // All other pagers are locked
+    const isDeepestInOrientation = activePagers.value
+      .filter((v) => {
+        return v.split(":")[0] === orientation;
+      })
+      .every((v) => {
+        return Number(v.split(":")[1]) <= nestingDepth;
+      });
+    return activePagers.value.length && !isDeepestInOrientation;
+  }, [activePagers, orientation]);
+
+  panGesture
+    .onBegin((evt) => {
+      "worklet";
+      if (!isAtEdge) {
+        const updated = activePagers.value.slice();
+        updated.push(pagerId);
+        activePagers.value = updated;
+      }
       startTranslate.value = translate.value;
+      initTouchX.value = evt.x;
+      initTouchY.value = evt.y;
+      if (debugTag) {
+        console.log(`${debugTag} onBegin`, evt);
+      }
+    })
+    .onTouchesMove((evt, mgr) => {
+      "worklet";
+      const mainTouch = evt.changedTouches[0];
+
+      const evtVal = mainTouch[vertical ? "y" : "x"];
+      const initTouch = vertical ? initTouchY.value : initTouchX.value;
+      const evtTranslate = evtVal - initTouch;
+
+      // const xAxisVal = mainTouch[vertical ? "x" : "y"]
+      // const xAxisInitTouch = vertical ? initTouchY.value : initTouchX.value;
+      // const xAxisTranslate = xAxisVal - xAxisInitTouch
+      // const isSwipingCrossAxis = Math.abs(xAxisTranslate) > 10 && Math.abs(xAxisTranslate) > Math.abs(evtTranslate)
+
+      const swipingPastEnd =
+        (isMinIndex.value && evtTranslate > 0) ||
+        (isMaxIndex.value && evtTranslate < 0);
+
+      const shouldFailSelf =
+        (!bouncePct && swipingPastEnd) || isGestureLocked.value;
+
+      if (shouldFailSelf) {
+        if (debugTag) {
+          const failReason = swipingPastEnd ? "range" : "locked";
+          const failDetails = swipingPastEnd
+            ? `${isMinIndex.value ? "min" : "max"}, ${evtTranslate}`
+            : "";
+          console.log(`${debugTag}: ${failReason} fail (${failDetails})`, evt);
+          const updated = activePagers.value
+            .slice()
+            .filter((pId) => pId !== pagerId);
+          activePagers.value = updated;
+        }
+        mgr.fail();
+      } else {
+        if (!activePagers.value.includes(pagerId)) {
+          const updated = activePagers.value.slice();
+          updated.push(pagerId);
+          activePagers.value = updated;
+        }
+      }
     })
     .onUpdate((evt) => {
+      "worklet";
       const evtTranslate = vertical ? evt.translationY : evt.translationX;
+      const crossAxisTranslate = vertical ? evt.translationX : evt.translationY;
+
+      const isSwipingCrossAxis =
+        Math.abs(crossAxisTranslate) > 10 &&
+        Math.abs(crossAxisTranslate) > Math.abs(evtTranslate);
+
+      if (isGestureLocked.value || isSwipingCrossAxis) return;
+
+      if (debugTag) {
+        console.log(
+          `${debugTag} onUpdate: ${isGestureLocked.value ? "(locked)" : ""}`,
+          evt
+        );
+      }
 
       const rawVal = startTranslate.value + evtTranslate;
       const page = -rawVal / pageSize.value;
-      if (page >= minIndex && page <= maxIndex) {
+      if (page >= minIndexAnim.value && page <= maxIndexAnim.value) {
         translate.value = rawVal;
       } else {
         const pageTrans = rawVal % pageSize.value;
@@ -217,67 +345,109 @@ function InfinitePager(
       }
     })
     .onEnd((evt) => {
+      "worklet";
       const evtVelocity = vertical ? evt.velocityY : evt.velocityX;
-      const isFling = Math.abs(evtVelocity) > flingVelocity;
+      const isFling = isGestureLocked.value
+        ? false
+        : Math.abs(evtVelocity) > flingVelocity;
       let velocityModifier = isFling ? pageSize.value / 2 : 0;
       if (evtVelocity < 0) velocityModifier *= -1;
       let page =
         -1 * Math.round((translate.value + velocityModifier) / pageSize.value);
-      if (page < minIndex) page = minIndex;
-      if (page > maxIndex) page = maxIndex;
+      if (page < minIndexAnim.value) page = minIndexAnim.value;
+      if (page > maxIndexAnim.value) page = maxIndexAnim.value;
 
       const animCfg = Object.assign(
         {},
         DEFAULT_ANIMATION_CONFIG,
         animCfgRef.current
       );
-
       translate.value = withSpring(-page * pageSize.value, animCfg);
+      if (debugTag) {
+        console.log(
+          `${debugTag}: onEnd (${
+            isGestureLocked.value ? "locked" : "unlocked"
+          })`,
+          evt
+        );
+      }
+    })
+    .onFinalize((evt) => {
+      "worklet";
+      const updatedPagerIds = activePagers.value
+        .slice()
+        .filter((id) => id !== pagerId);
+      activePagers.value = updatedPagerIds;
+
+      if (debugTag) {
+        console.log(
+          `${debugTag}: onFinalize (${
+            isGestureLocked.value ? "locked" : "unlocked"
+          })`,
+          evt
+        );
+      }
     })
     .enabled(!gesturesDisabled);
 
+  if (typeof minDistance === "number") {
+    panGesture.minDistance(minDistance);
+  }
+
+  const allGestures = useMemo(
+    () => [panGesture, ...parentGestures, ...simultaneousGestures],
+    [panGesture, parentGestures, simultaneousGestures]
+  );
+
+  const wrapperStyle = useMemo(() => {
+    const s: StyleProp<ViewStyle> = {};
+    if (width) s.width = width;
+    if (height) s.height = height;
+    return s;
+  }, [width, height]);
+
   return (
-    <GestureDetector
-      gesture={Gesture.Simultaneous(panGesture, ...simultaneousGestures)}
-    >
-      <Animated.View
-        style={style}
-        onLayout={({ nativeEvent: { layout } }) => {
-          pageWidth.value = layout.width;
-          pageHeight.value = layout.height;
-        }}
-      >
-        {pageIndices.map((pageIndex) => {
-          return (
-            <PageWrapper
-              key={`page-provider-wrapper-${pageIndex}`}
-              vertical={vertical}
-              pageAnim={pageAnim}
-              index={pageIndex}
-              pageWidth={pageWidth}
-              pageHeight={pageHeight}
-              isActive={pageIndex === curIndex}
-              PageComponent={PageComponent}
-              renderPage={renderPage}
-              style={pageWrapperStyle}
-              pageInterpolatorRef={pageInterpolatorRef}
-              pageBuffer={pageBuffer}
-            />
-          );
-        })}
-      </Animated.View>
-    </GestureDetector>
+    <InfinitePagerProvider simultaneousGestures={allGestures}>
+      <GestureDetector gesture={Gesture.Simultaneous(...allGestures)}>
+        <Animated.View
+          style={[wrapperStyle, style]}
+          onLayout={({ nativeEvent: { layout } }) => {
+            pageWidth.value = layout.width;
+            pageHeight.value = layout.height;
+          }}
+        >
+          {pageIndices.map((pageIndex) => {
+            return (
+              <PageWrapper
+                key={`page-provider-wrapper-${pageIndex}`}
+                vertical={vertical}
+                pageAnim={pageAnim}
+                index={pageIndex}
+                pageWidth={pageWidth}
+                pageHeight={pageHeight}
+                isActive={pageIndex === curIndex}
+                PageComponent={PageComponent}
+                renderPage={renderPage}
+                style={pageWrapperStyle}
+                pageInterpolatorRef={pageInterpolatorRef}
+                pageBuffer={pageBuffer}
+              />
+            );
+          })}
+        </Animated.View>
+      </GestureDetector>
+    </InfinitePagerProvider>
   );
 }
 
 type PageWrapperProps = {
   vertical: boolean;
-  pageAnim: Animated.SharedValue<number>;
+  pageAnim: SharedValue<number>;
   index: number;
-  pageWidth: Animated.SharedValue<number>;
-  pageHeight: Animated.SharedValue<number>;
-  PageComponent?: PageComponentType;
-  renderPage?: PageComponentType;
+  pageWidth: SharedValue<number>;
+  pageHeight: SharedValue<number>;
+  PageComponent?: InfinitePagerPageComponent;
+  renderPage?: InfinitePagerPageComponent;
   isActive: boolean;
   style?: AnyStyle;
   pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
@@ -287,10 +457,10 @@ type PageWrapperProps = {
 export type PageInterpolatorParams = {
   index: number;
   vertical: boolean;
-  focusAnim: Animated.DerivedValue<number>;
-  pageAnim: Animated.DerivedValue<number>;
-  pageWidth: Animated.SharedValue<number>;
-  pageHeight: Animated.SharedValue<number>;
+  focusAnim: DerivedValue<number>;
+  pageAnim: DerivedValue<number>;
+  pageWidth: SharedValue<number>;
+  pageHeight: SharedValue<number>;
   pageBuffer: number;
 };
 
@@ -316,7 +486,9 @@ const PageWrapper = React.memo(
     }, []);
 
     const focusAnim = useDerivedValue(() => {
-      if (!pageSize.value) return 99999;
+      if (!pageSize.value) {
+        return index;
+      }
       return translation.value / pageSize.value;
     }, []);
 
@@ -357,6 +529,7 @@ const PageWrapper = React.memo(
 
     return (
       <Animated.View
+        pointerEvents={isActive ? "auto" : "none"}
         style={[
           style,
           styles.pageWrapper,
@@ -402,3 +575,37 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 });
+
+type SimultaneousGesture = ComposedGesture | GestureType;
+
+const InfinitePagerContext = React.createContext({
+  simultaneousGestures: [] as SimultaneousGesture[],
+  activePagers: makeMutable([] as string[]),
+  nestingDepth: 0,
+});
+
+function InfinitePagerProvider({
+  simultaneousGestures = [],
+  children,
+}: {
+  registerChildGesture?: (childGesture: SimultaneousGesture) => void;
+  simultaneousGestures?: SimultaneousGesture[];
+  gestureLock?: SharedValue<boolean>;
+  children: React.ReactNode;
+}) {
+  const { nestingDepth, activePagers } = useContext(InfinitePagerContext);
+
+  const value = useMemo(() => {
+    return {
+      simultaneousGestures,
+      nestingDepth: nestingDepth + 1,
+      activePagers,
+    };
+  }, [simultaneousGestures, nestingDepth, activePagers]);
+
+  return (
+    <InfinitePagerContext.Provider value={value}>
+      {children}
+    </InfinitePagerContext.Provider>
+  );
+}
