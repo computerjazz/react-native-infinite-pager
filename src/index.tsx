@@ -347,9 +347,15 @@ function InfinitePager(
     .onEnd((evt) => {
       "worklet";
       const evtVelocity = vertical ? evt.velocityY : evt.velocityX;
-      const isFling = isGestureLocked.value
-        ? false
-        : Math.abs(evtVelocity) > flingVelocity;
+      const evtTranslate = vertical ? evt.translationY : evt.translationX;
+      const crossAxisTranslate = vertical ? evt.translationX : evt.translationY;
+      const isSwipingCrossAxis =
+        Math.abs(crossAxisTranslate) > Math.abs(evtTranslate);
+
+      const isFling =
+        isGestureLocked.value || isSwipingCrossAxis
+          ? false
+          : Math.abs(evtVelocity) > flingVelocity;
       let velocityModifier = isFling ? pageSize.value / 2 : 0;
       if (evtVelocity < 0) velocityModifier *= -1;
       let page =
