@@ -107,6 +107,13 @@ export type InfinitePagerImperativeApi = {
   decrementPage: (options: ImperativeApiOptions) => void;
 };
 
+const EMPTY_SIMULTANEOUS_GESTURES: NonNullable<
+  InfinitePagerProps["simultaneousGestures"]
+> = [];
+const EMPTY_ANIMATION_CONFIG: NonNullable<
+  InfinitePagerProps["animationConfig"]
+> = {};
+
 function InfinitePager(
   {
     vertical = false,
@@ -118,9 +125,9 @@ function InfinitePager(
     pageWrapperStyle,
     minIndex = -Infinity,
     maxIndex = Infinity,
-    simultaneousGestures = [],
+    simultaneousGestures = EMPTY_SIMULTANEOUS_GESTURES,
     gesturesDisabled,
-    animationConfig = {},
+    animationConfig = EMPTY_ANIMATION_CONFIG,
     renderPage,
     flingVelocity = 500,
     preset = Preset.SLIDE,
@@ -164,6 +171,10 @@ function InfinitePager(
 
   const animCfgRef = useRef(animationConfig);
   animCfgRef.current = animationConfig;
+
+  const gesturesDisabledAnim = useDerivedValue(() => {
+    return !!gesturesDisabled;
+  }, [gesturesDisabled]);
 
   const setPage = useCallback(
     (index: number, options: ImperativeApiOptions = {}) => {
@@ -293,7 +304,9 @@ function InfinitePager(
         (isMaxIndex.value && evtTranslate < 0);
 
       const shouldFailSelf =
-        (!bouncePct && swipingPastEnd) || isGestureLocked.value;
+        (!bouncePct && swipingPastEnd) ||
+        isGestureLocked.value ||
+        gesturesDisabledAnim.value;
 
       if (shouldFailSelf) {
         if (debugTag) {
