@@ -179,6 +179,9 @@ function InfinitePager(
   const setPage = useCallback(
     (index: number, options: ImperativeApiOptions = {}) => {
       const updatedTranslate = index * pageSize.value * -1;
+
+      if (index < minIndex || index > maxIndex) return;
+
       if (options.animated) {
         const animCfg = {
           ...DEFAULT_ANIMATION_CONFIG,
@@ -190,7 +193,7 @@ function InfinitePager(
         translate.value = updatedTranslate;
       }
     },
-    [pageSize, translate]
+    [pageSize, translate, minIndex, maxIndex]
   );
 
   useImperativeHandle(
