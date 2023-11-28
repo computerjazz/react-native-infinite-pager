@@ -460,6 +460,7 @@ function InfinitePager(
                 pageBuffer={pageBuffer}
                 debugTag={debugTag}
                 panGesture={panGesture}
+                isRootPager={!nestingDepth}
               />
             );
           })}
@@ -483,6 +484,7 @@ type PageWrapperProps = {
   pageBuffer: number;
   debugTag?: string;
   panGesture: PanGesture;
+  isRootPager: boolean;
 };
 
 export type PageInterpolatorParams = {
@@ -508,6 +510,7 @@ const PageWrapper = React.memo(
     style,
     pageInterpolatorRef,
     pageBuffer,
+    isRootPager,
     panGesture,
   }: PageWrapperProps) => {
     const pageSize = vertical ? pageHeight : pageWidth;
@@ -569,6 +572,30 @@ const PageWrapper = React.memo(
           isActive && styles.activePage,
         ]}
       >
+        {/**
+         * For some reason this prevents a bug with nested pagers where, if the outer pager
+         * displays mixed nested and non-nested content, it can become unresponsive when nested
+         * items exit.
+         */}
+        {isRootPager && (
+          <Animated.View
+            pointerEvents={"none"}
+            style={{
+              position: "absolute",
+              left: -10000,
+              top: -10000,
+              width: 0,
+              height: 0,
+            }}
+          >
+            <GestureDetector gesture={panGesture}>
+              <Animated.View
+                collapsable={false}
+                style={{ width: 1, height: 1 }}
+              />
+            </GestureDetector>
+          </Animated.View>
+        )}
         {PageComponent ? (
           <PageComponent
             index={index}
@@ -588,14 +615,6 @@ const PageWrapper = React.memo(
             pageAnim,
           })
         )}
-        {/**
-         * For some reason this prevents a bug with nested pagers where, if the outer pager
-         * displays mixed nested and non-nested content, it can become unresponsive when nested
-         * items exit.
-         */}
-        <GestureDetector gesture={panGesture}>
-          <Animated.View />
-        </GestureDetector>
       </Animated.View>
     );
   }
