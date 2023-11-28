@@ -5,6 +5,7 @@ import React, {
   useRef,
   useContext,
   useMemo,
+  useLayoutEffect,
 } from "react";
 import { StyleProp, StyleSheet, ViewStyle } from "react-native";
 import Animated, {
@@ -24,7 +25,6 @@ import {
   Gesture,
   GestureDetector,
   GestureType,
-  PanGesture,
 } from "react-native-gesture-handler";
 import {
   defaultPageInterpolator,
@@ -298,11 +298,6 @@ function InfinitePager(
       const initTouch = vertical ? initTouchY.value : initTouchX.value;
       const evtTranslate = evtVal - initTouch;
 
-      // const xAxisVal = mainTouch[vertical ? "x" : "y"]
-      // const xAxisInitTouch = vertical ? initTouchY.value : initTouchX.value;
-      // const xAxisTranslate = xAxisVal - xAxisInitTouch
-      // const isSwipingCrossAxis = Math.abs(xAxisTranslate) > 10 && Math.abs(xAxisTranslate) > Math.abs(evtTranslate)
-
       const swipingPastEnd =
         (isMinIndex.value && evtTranslate > 0) ||
         (isMaxIndex.value && evtTranslate < 0);
@@ -417,10 +412,16 @@ function InfinitePager(
     panGesture.minDistance(minDistance);
   }
 
-  const allGestures = useMemo(
-    () => [panGesture, ...parentGestures, ...simultaneousGestures],
-    [panGesture, parentGestures, simultaneousGestures]
-  );
+  // For some reason this prevents a bug with nested pagers where, if the outer pager
+  // displays a mix of nested and non-nested content,
+  // it can become unresponsive when non-nested items enter or exit.
+  useLayoutEffect(() => {
+    panGesture.initialize();
+  }, [curIndex, minIndex, maxIndex, panGesture]);
+
+  const allGestures = useMemo(() => {
+    return [panGesture, ...parentGestures, ...simultaneousGestures];
+  }, [panGesture, parentGestures, simultaneousGestures]);
 
   const wrapperStyle = useMemo(() => {
     const s: StyleProp<ViewStyle> = {};
@@ -459,8 +460,6 @@ function InfinitePager(
                 pageInterpolatorRef={pageInterpolatorRef}
                 pageBuffer={pageBuffer}
                 debugTag={debugTag}
-                panGesture={panGesture}
-                isRootPager={!nestingDepth}
               />
             );
           })}
@@ -483,8 +482,6 @@ type PageWrapperProps = {
   pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
   pageBuffer: number;
   debugTag?: string;
-  panGesture: PanGesture;
-  isRootPager: boolean;
 };
 
 export type PageInterpolatorParams = {
@@ -510,8 +507,6 @@ const PageWrapper = React.memo(
     style,
     pageInterpolatorRef,
     pageBuffer,
-    isRootPager,
-    panGesture,
   }: PageWrapperProps) => {
     const pageSize = vertical ? pageHeight : pageWidth;
 
@@ -572,30 +567,6 @@ const PageWrapper = React.memo(
           isActive && styles.activePage,
         ]}
       >
-        {/**
-         * For some reason this prevents a bug with nested pagers where, if the outer pager
-         * displays mixed nested and non-nested content, it can become unresponsive when nested
-         * items exit.
-         */}
-        {isRootPager && (
-          <Animated.View
-            pointerEvents={"none"}
-            style={{
-              position: "absolute",
-              left: -10000,
-              top: -10000,
-              width: 0,
-              height: 0,
-            }}
-          >
-            <GestureDetector gesture={panGesture}>
-              <Animated.View
-                collapsable={false}
-                style={{ width: 1, height: 1 }}
-              />
-            </GestureDetector>
-          </Animated.View>
-        )}
         {PageComponent ? (
           <PageComponent
             index={index}
