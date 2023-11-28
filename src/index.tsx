@@ -24,6 +24,7 @@ import {
   Gesture,
   GestureDetector,
   GestureType,
+  PanGesture,
 } from "react-native-gesture-handler";
 import {
   defaultPageInterpolator,
@@ -428,9 +429,13 @@ function InfinitePager(
     return s;
   }, [width, height]);
 
+  const gesture = useMemo(() => {
+    return Gesture.Simultaneous(...allGestures);
+  }, [allGestures]);
+
   return (
     <InfinitePagerProvider simultaneousGestures={allGestures}>
-      <GestureDetector gesture={Gesture.Simultaneous(...allGestures)}>
+      <GestureDetector gesture={gesture}>
         <Animated.View
           style={[wrapperStyle, style]}
           onLayout={({ nativeEvent: { layout } }) => {
@@ -453,6 +458,8 @@ function InfinitePager(
                 style={pageWrapperStyle}
                 pageInterpolatorRef={pageInterpolatorRef}
                 pageBuffer={pageBuffer}
+                debugTag={debugTag}
+                panGesture={panGesture}
               />
             );
           })}
@@ -474,6 +481,8 @@ type PageWrapperProps = {
   style?: AnyStyle;
   pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
   pageBuffer: number;
+  debugTag?: string;
+  panGesture: PanGesture;
 };
 
 export type PageInterpolatorParams = {
@@ -499,6 +508,7 @@ const PageWrapper = React.memo(
     style,
     pageInterpolatorRef,
     pageBuffer,
+    panGesture,
   }: PageWrapperProps) => {
     const pageSize = vertical ? pageHeight : pageWidth;
 
@@ -578,6 +588,14 @@ const PageWrapper = React.memo(
             pageAnim,
           })
         )}
+        {/**
+         * For some reason this prevents a bug with nested pagers where, if the outer pager
+         * displays mixed nested and non-nested content, it can become unresponsive when nested
+         * items exit.
+         */}
+        <GestureDetector gesture={panGesture}>
+          <Animated.View />
+        </GestureDetector>
       </Animated.View>
     );
   }
@@ -610,9 +628,7 @@ function InfinitePagerProvider({
   simultaneousGestures = [],
   children,
 }: {
-  registerChildGesture?: (childGesture: SimultaneousGesture) => void;
   simultaneousGestures?: SimultaneousGesture[];
-  gestureLock?: SharedValue<boolean>;
   children: React.ReactNode;
 }) {
   const { nestingDepth, activePagers } = useContext(InfinitePagerContext);
