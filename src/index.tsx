@@ -6,6 +6,7 @@ import React, {
   useContext,
   useMemo,
   useEffect,
+  useLayoutEffect,
 } from "react";
 import { StyleProp, StyleSheet, ViewStyle } from "react-native";
 import Animated, {
@@ -156,25 +157,23 @@ function InfinitePager(
   const pageAnimInternal = useSharedValue(0);
   const pageAnim = pageCallbackNode || pageAnimInternal;
 
-  const {
-    simultaneousGestures: parentGestures,
-    activePagers,
-    nestingDepth,
-    pagers,
-  } = useContext(InfinitePagerContext);
+  const { activePagers, nestingDepth, pagers } =
+    useContext(InfinitePagerContext);
+
+  const parentGestures = useContext(SimultaneousGestureContext);
 
   const pagerId = useMemo(() => {
     return `${orientation}:${nestingDepth}:${Math.random()}`;
   }, [orientation, nestingDepth]);
 
   useEffect(() => {
-    const updated = pagers.value.slice().filter((p) => p !== pagerId);
-    updated.push(pagerId);
-    pagers.value = updated;
-
+    const updated = new Set(pagers.value);
+    updated.add(pagerId);
+    pagers.value = [...updated.values()];
     return () => {
-      const updated = pagers.value.slice().filter((p) => p !== pagerId);
-      pagers.value = updated;
+      const updated = new Set(pagers.value);
+      updated.delete(pagerId);
+      pagers.value = [...updated.values()];
     };
   }, [pagerId, pagers]);
 
@@ -430,19 +429,25 @@ function InfinitePager(
     panGesture.initialize();
   }, [panGesture]);
 
+  useLayoutEffect(() => {
+    if (nestingDepth === 0) {
+      reInitGesture();
+    }
+  }, [curIndex, minIndex, maxIndex, reInitGesture, pageBuffer, nestingDepth]);
+
   useAnimatedReaction(
     () => {
       return pagers.value.join(",");
     },
     (val, prev) => {
-      if (val && prev !== null) {
+      if (val && val !== prev && prev !== null && nestingDepth === 0) {
         // For some reason this prevents a bug with nested pagers where, if the outer pager
         // displays a mix of nested and non-nested content,
         // it can become unresponsive when non-nested items enter or exit.
         runOnJS(reInitGesture)();
       }
     },
-    [pagers, panGesture]
+    [pagers, panGesture, nestingDepth]
   );
 
   const allGestures = useMemo(() => {
@@ -461,7 +466,7 @@ function InfinitePager(
   }, [allGestures]);
 
   return (
-    <InfinitePagerProvider simultaneousGestures={allGestures}>
+    <SimultaneousGestureProvider simultaneousGestures={allGestures}>
       <GestureDetector gesture={gesture}>
         <Animated.View
           style={[wrapperStyle, style]}
@@ -491,7 +496,7 @@ function InfinitePager(
           })}
         </Animated.View>
       </GestureDetector>
-    </InfinitePagerProvider>
+    </SimultaneousGestureProvider>
   );
 }
 
@@ -617,7 +622,17 @@ const PageWrapper = React.memo(
   }
 );
 
-export default React.memo(React.forwardRef(InfinitePager));
+export default React.memo(withWrappedProvider(React.forwardRef(InfinitePager)));
+
+function withWrappedProvider<P extends object>(Inner: React.ComponentType<P>) {
+  return React.forwardRef((props: P) => {
+    return (
+      <InfinitePagerProvider>
+        <Inner {...props} />
+      </InfinitePagerProvider>
+    );
+  });
+}
 
 const styles = StyleSheet.create({
   pageWrapper: {
@@ -635,30 +650,44 @@ const styles = StyleSheet.create({
 type SimultaneousGesture = ComposedGesture | GestureType;
 
 const InfinitePagerContext = React.createContext({
-  simultaneousGestures: [] as SimultaneousGesture[],
   activePagers: makeMutable([] as string[]),
   pagers: makeMutable([] as string[]),
-  nestingDepth: 0,
+  nestingDepth: -1,
 });
 
-function InfinitePagerProvider({
-  simultaneousGestures = [],
+const SimultaneousGestureContext = React.createContext(
+  [] as SimultaneousGesture[]
+);
+
+function SimultaneousGestureProvider({
+  simultaneousGestures = EMPTY_SIMULTANEOUS_GESTURES,
   children,
 }: {
   simultaneousGestures?: SimultaneousGesture[];
   children: React.ReactNode;
 }) {
+  return (
+    <SimultaneousGestureContext.Provider value={simultaneousGestures}>
+      {children}
+    </SimultaneousGestureContext.Provider>
+  );
+}
+
+function InfinitePagerProvider({ children }: { children: React.ReactNode }) {
   const { nestingDepth, activePagers, pagers } =
     useContext(InfinitePagerContext);
+  const rootPagers = useSharedValue<string[]>([]);
+  const rootActivePagers = useSharedValue<string[]>([]);
 
   const value = useMemo(() => {
+    const isRoot = nestingDepth === -1;
+
     return {
-      simultaneousGestures,
       nestingDepth: nestingDepth + 1,
-      activePagers,
-      pagers,
+      activePagers: isRoot ? rootActivePagers : activePagers,
+      pagers: isRoot ? rootPagers : pagers,
     };
-  }, [simultaneousGestures, nestingDepth, activePagers, pagers]);
+  }, [nestingDepth, activePagers, pagers, rootPagers, rootActivePagers]);
 
   return (
     <InfinitePagerContext.Provider value={value}>
