@@ -624,11 +624,13 @@ const PageWrapper = React.memo(
 
 export default React.memo(withWrappedProvider(React.forwardRef(InfinitePager)));
 
-function withWrappedProvider<P extends object>(Inner: React.ComponentType<P>) {
-  return React.forwardRef((props: P) => {
+function withWrappedProvider<P extends object, R extends object>(
+  Inner: React.ComponentType<P>
+) {
+  return React.forwardRef((props: P, ref: React.ForwardedRef<R>) => {
     return (
       <InfinitePagerProvider>
-        <Inner {...props} />
+        <Inner {...props} ref={ref} />
       </InfinitePagerProvider>
     );
   });
