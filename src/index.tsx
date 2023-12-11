@@ -6,7 +6,6 @@ import React, {
   useContext,
   useMemo,
   useEffect,
-  useLayoutEffect,
 } from "react";
 import { StyleProp, StyleSheet, ViewStyle } from "react-native";
 import Animated, {
@@ -425,34 +424,21 @@ function InfinitePager(
     panGesture.minDistance(minDistance);
   }
 
-  const reInitGesture = useCallback(() => {
-    panGesture.initialize();
-  }, [panGesture]);
+  const externalGestures = useMemo(() => {
+    const all = [...parentGestures, ...simultaneousGestures];
+    const toGestureType = all.reduce((acc, cur) => {
+      acc.push(...cur.toGestureArray());
+      return acc;
+    }, [] as GestureType[]);
 
-  useLayoutEffect(() => {
-    if (nestingDepth === 0) {
-      reInitGesture();
-    }
-  }, [curIndex, minIndex, maxIndex, reInitGesture, pageBuffer, nestingDepth]);
+    return toGestureType;
+  }, [parentGestures, simultaneousGestures]);
 
-  useAnimatedReaction(
-    () => {
-      return pagers.value.join(",");
-    },
-    (val, prev) => {
-      if (val && val !== prev && prev !== null && nestingDepth === 0) {
-        // For some reason this prevents a bug with nested pagers where, if the outer pager
-        // displays a mix of nested and non-nested content,
-        // it can become unresponsive when non-nested items enter or exit.
-        runOnJS(reInitGesture)();
-      }
-    },
-    [pagers, panGesture, nestingDepth]
-  );
+  panGesture.simultaneousWithExternalGesture(...externalGestures);
 
   const allGestures = useMemo(() => {
-    return [panGesture, ...parentGestures, ...simultaneousGestures];
-  }, [panGesture, parentGestures, simultaneousGestures]);
+    return [panGesture, ...externalGestures];
+  }, [panGesture, externalGestures]);
 
   const wrapperStyle = useMemo(() => {
     const s: StyleProp<ViewStyle> = {};
@@ -461,13 +447,9 @@ function InfinitePager(
     return s;
   }, [width, height]);
 
-  const gesture = useMemo(() => {
-    return Gesture.Simultaneous(...allGestures);
-  }, [allGestures]);
-
   return (
     <SimultaneousGestureProvider simultaneousGestures={allGestures}>
-      <GestureDetector gesture={gesture}>
+      <GestureDetector gesture={panGesture}>
         <Animated.View
           style={[wrapperStyle, style]}
           onLayout={({ nativeEvent: { layout } }) => {
