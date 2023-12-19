@@ -18,7 +18,6 @@ import Animated, {
   makeMutable,
   SharedValue,
   DerivedValue,
-  withTiming,
 } from "react-native-reanimated";
 import {
   ComposedGesture,
@@ -98,7 +97,6 @@ export type InfinitePagerProps = {
   height?: number;
   minDistance?: number;
   initialIndex?: number;
-  fadeInDuration?: number;
 };
 
 type ImperativeApiOptions = {
@@ -142,11 +140,21 @@ function InfinitePager(
     height,
     minDistance,
     initialIndex = 0,
-    fadeInDuration = 0,
   }: InfinitePagerProps,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
   const orientation = vertical ? "vertical" : "horizontal";
+  const initIdx = useMemo(() => {
+    if (initialIndex) {
+      return initialIndex;
+    } else if (minIndex > 0) {
+      return minIndex;
+    } else if (maxIndex < 0) {
+      return maxIndex;
+    } else {
+      return 0;
+    }
+  }, [initialIndex, minIndex, maxIndex]);
 
   const pageWidth = useSharedValue(width || 0);
   const pageHeight = useSharedValue(height || 0);
@@ -163,9 +171,9 @@ function InfinitePager(
   const translateY = useSharedValue(0);
   const translate = vertical ? translateY : translateX;
 
-  const [curIndex, setCurIndex] = useState(0);
+  const [curIndex, setCurIndex] = useState(initIdx);
 
-  const pageAnimInternal = useSharedValue(0);
+  const pageAnimInternal = useSharedValue(initIdx);
   const pageAnim = pageCallbackNode || pageAnimInternal;
 
   const { activePagers, nestingDepth, pagers } =
@@ -176,29 +184,6 @@ function InfinitePager(
   const pagerId = useMemo(() => {
     return `${orientation}:${nestingDepth}:${Math.random()}`;
   }, [orientation, nestingDepth]);
-
-  const initIdx = useMemo(() => {
-    if (initialIndex) {
-      return initialIndex;
-    } else if (minIndex > 0) {
-      return minIndex;
-    } else if (maxIndex < 0) {
-      return maxIndex;
-    } else {
-      return 0;
-    }
-  }, [initialIndex, minIndex, maxIndex]);
-
-  const onMount = useStableCallback(async () => {
-    const layoutPageSize = await onLayoutPromiseRef.current;
-    const pSize = pageSize.value || layoutPageSize;
-    const initTranslate = initIdx * pSize * -1;
-    translate.value = initTranslate;
-  });
-
-  useEffect(() => {
-    onMount();
-  }, [onMount]);
 
   useEffect(() => {
     const updated = new Set(pagers.value);
@@ -266,9 +251,9 @@ function InfinitePager(
 
   useDerivedValue(() => {
     if (pageSize.value) {
-      pageAnim.value = (translate.value / pageSize.value) * -1;
+      pageAnim.value = initIdx + (translate.value / pageSize.value) * -1;
     }
-  }, [pageSize, pageAnim, translate]);
+  }, [pageSize, pageAnim, translate, initIdx]);
 
   const onPageChangeInternal = useStableCallback((pg: number) => {
     onPageChange?.(pg);
@@ -395,7 +380,7 @@ function InfinitePager(
       }
 
       const rawVal = startTranslate.value + evtTranslate;
-      const page = -rawVal / pageSize.value;
+      const page = initIdx + -rawVal / pageSize.value;
       if (page >= minIndexAnim.value && page <= maxIndexAnim.value) {
         translate.value = rawVal;
       } else {
@@ -419,6 +404,7 @@ function InfinitePager(
       let velocityModifier = isFling ? pageSize.value / 2 : 0;
       if (evtVelocity < 0) velocityModifier *= -1;
       let page =
+        initIdx +
         -1 * Math.round((translate.value + velocityModifier) / pageSize.value);
       if (page < minIndexAnim.value) page = minIndexAnim.value;
       if (page > maxIndexAnim.value) page = maxIndexAnim.value;
@@ -428,7 +414,7 @@ function InfinitePager(
         DEFAULT_ANIMATION_CONFIG,
         animCfgRef.current
       );
-      translate.value = withSpring(-page * pageSize.value, animCfg);
+      translate.value = withSpring(-(page - initIdx) * pageSize.value, animCfg);
       if (debugTag) {
         console.log(
           `${debugTag}: onEnd (${
@@ -483,18 +469,11 @@ function InfinitePager(
     return s;
   }, [width, height]);
 
-  const animStyle = useAnimatedStyle(() => {
-    const hasInitialized = !initIdx || !!translate.value;
-    return {
-      opacity: hasInitialized ? withTiming(1, { duration: fadeInDuration }) : 0,
-    };
-  }, [initIdx]);
-
   return (
     <SimultaneousGestureProvider simultaneousGestures={allGestures}>
       <GestureDetector gesture={panGesture}>
         <Animated.View
-          style={[wrapperStyle, animStyle, style]}
+          style={[wrapperStyle, style]}
           onLayout={({ nativeEvent: { layout } }) => {
             pageWidth.value = layout.width;
             pageHeight.value = layout.height;
@@ -517,6 +496,7 @@ function InfinitePager(
                 pageInterpolatorRef={pageInterpolatorRef}
                 pageBuffer={pageBuffer}
                 debugTag={debugTag}
+                initIdx={initIdx}
               />
             );
           })}
@@ -539,6 +519,7 @@ type PageWrapperProps = {
   pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
   pageBuffer: number;
   debugTag?: string;
+  initIndex: number;
 };
 
 export type PageInterpolatorParams = {
@@ -564,6 +545,7 @@ const PageWrapper = React.memo(
     style,
     pageInterpolatorRef,
     pageBuffer,
+    initIndex,
   }: PageWrapperProps) => {
     const pageSize = vertical ? pageHeight : pageWidth;
 
@@ -582,7 +564,7 @@ const PageWrapper = React.memo(
     const animStyle = useAnimatedStyle(() => {
       // Short circuit page interpolation to prevent buggy initial values due to possible race condition:
       // https://github.com/software-mansion/react-native-reanimated/issues/2571
-      const isInactivePageBeforeInit = index !== 0 && !pageSize.value;
+      const isInactivePageBeforeInit = index !== initIndex && !pageSize.value;
       const _pageWidth = isInactivePageBeforeInit ? focusAnim : pageWidth;
       const _pageHeight = isInactivePageBeforeInit ? focusAnim : pageHeight;
       return pageInterpolatorRef.current({
@@ -599,6 +581,7 @@ const PageWrapper = React.memo(
       pageHeight,
       pageAnim,
       index,
+      initIndex,
       translation,
       vertical,
       pageBuffer,
