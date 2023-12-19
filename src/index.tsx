@@ -496,7 +496,7 @@ function InfinitePager(
                 pageInterpolatorRef={pageInterpolatorRef}
                 pageBuffer={pageBuffer}
                 debugTag={debugTag}
-                initIdx={initIdx}
+                initIndex={initIdx}
               />
             );
           })}
