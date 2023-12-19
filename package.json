@@ -1,6 +1,6 @@
 {
   "name": "react-native-infinite-pager",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "description": "A pager component that renders pages dynamically. Powered by reanimated.",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
