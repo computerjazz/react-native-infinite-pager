@@ -1,7 +1,6 @@
 import React, {
   useState,
   useImperativeHandle,
-  useCallback,
   useRef,
   useContext,
   useMemo,
@@ -33,6 +32,7 @@ import {
   pageInterpolatorStack,
   pageInterpolatorTurnIn,
 } from "./pageInterpolators";
+import { useStableCallback } from "./useStableCallback";
 
 export enum Preset {
   SLIDE = "slide",
@@ -147,6 +147,13 @@ function InfinitePager(
   const pageHeight = useSharedValue(height || 0);
   const pageSize = vertical ? pageHeight : pageWidth;
 
+  const onLayoutResolveRef = useRef((_val: number) => {});
+  const onLayoutPromiseRef = useRef(
+    new Promise<number>((resolve) => {
+      onLayoutResolveRef.current = resolve;
+    })
+  );
+
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const translate = vertical ? translateY : translateX;
@@ -189,9 +196,11 @@ function InfinitePager(
     return !!gesturesDisabled;
   }, [gesturesDisabled]);
 
-  const setPage = useCallback(
-    (index: number, options: ImperativeApiOptions = {}) => {
-      const updatedTranslate = index * pageSize.value * -1;
+  const setPage = useStableCallback(
+    async (index: number, options: ImperativeApiOptions = {}) => {
+      const layoutPageSize = await onLayoutPromiseRef.current;
+      const pSize = pageSize.value || layoutPageSize;
+      const updatedTranslate = index * pSize * -1;
 
       if (index < minIndex || index > maxIndex) return;
 
@@ -205,8 +214,7 @@ function InfinitePager(
       } else {
         translate.value = updatedTranslate;
       }
-    },
-    [pageSize, translate, minIndex, maxIndex]
+    }
   );
 
   useImperativeHandle(
@@ -234,10 +242,10 @@ function InfinitePager(
     }
   }, [pageSize, pageAnim, translate]);
 
-  function onPageChangeInternal(pg: number) {
+  const onPageChangeInternal = useStableCallback((pg: number) => {
     onPageChange?.(pg);
     setCurIndex(pg);
-  }
+  });
 
   useAnimatedReaction(
     () => {
@@ -455,6 +463,7 @@ function InfinitePager(
           onLayout={({ nativeEvent: { layout } }) => {
             pageWidth.value = layout.width;
             pageHeight.value = layout.height;
+            onLayoutResolveRef.current(vertical ? layout.height : layout.width);
           }}
         >
           {pageIndices.map((pageIndex) => {
