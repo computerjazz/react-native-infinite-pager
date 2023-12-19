@@ -39,6 +39,7 @@ type Props = {
   pageInterpolator?: typeof defaultPageInterpolator;
   minIndex?: number;
   maxIndex?: number;
+  initialIndex?: number;
   simultaneousGestures?: (ComposedGesture | GestureType)[];
   gesturesDisabled?: boolean;
   animationConfig?: Partial<WithSpringConfig>;
@@ -60,6 +61,7 @@ type Props = {
 | `pageInterpolator` | `(params: PageInterpolatorParams) => ReturnType<typeof useAnimatedStyle>`               | Interpolator for custom page animations.    |
 | `minIndex`            | `number`               | Minimum page index for non-infinite behavior (optional).                   |
 | `maxIndex`            | `number`               | Maximum page index for non-infinite behavior (optional).                   |
+| `initialIndex`            | `number`               | Index that the pager initializes at (optional).                   |
 | `simultaneousGestures`            | `(ComposedGesture \| GestureType)[]`               | Simultaneous RNGH gestures.                   |
 | `gesturesDisabled`            | `boolean`               | Disables pan gestures.                   |
 | `animationConfig`            | `Partial<WithSpringConfig>`               | Customizes paging animations.                   |
