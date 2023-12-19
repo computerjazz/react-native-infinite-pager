@@ -18,6 +18,7 @@ import Animated, {
   makeMutable,
   SharedValue,
   DerivedValue,
+  withTiming,
 } from "react-native-reanimated";
 import {
   ComposedGesture,
@@ -96,6 +97,8 @@ export type InfinitePagerProps = {
   width?: number;
   height?: number;
   minDistance?: number;
+  initialIndex?: number;
+  fadeInDuration?: number;
 };
 
 type ImperativeApiOptions = {
@@ -138,6 +141,8 @@ function InfinitePager(
     width,
     height,
     minDistance,
+    initialIndex = 0,
+    fadeInDuration = 0,
   }: InfinitePagerProps,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -171,6 +176,29 @@ function InfinitePager(
   const pagerId = useMemo(() => {
     return `${orientation}:${nestingDepth}:${Math.random()}`;
   }, [orientation, nestingDepth]);
+
+  const initIdx = useMemo(() => {
+    if (initialIndex) {
+      return initialIndex;
+    } else if (minIndex > 0) {
+      return minIndex;
+    } else if (maxIndex < 0) {
+      return maxIndex;
+    } else {
+      return 0;
+    }
+  }, [initialIndex, minIndex, maxIndex]);
+
+  const onMount = useStableCallback(async () => {
+    const layoutPageSize = await onLayoutPromiseRef.current;
+    const pSize = pageSize.value || layoutPageSize;
+    const initTranslate = initIdx * pSize * -1;
+    translate.value = initTranslate;
+  });
+
+  useEffect(() => {
+    onMount();
+  }, [onMount]);
 
   useEffect(() => {
     const updated = new Set(pagers.value);
@@ -455,11 +483,18 @@ function InfinitePager(
     return s;
   }, [width, height]);
 
+  const animStyle = useAnimatedStyle(() => {
+    const hasInitialized = !initIdx || !!translate.value;
+    return {
+      opacity: hasInitialized ? withTiming(1, { duration: fadeInDuration }) : 0,
+    };
+  }, [initIdx]);
+
   return (
     <SimultaneousGestureProvider simultaneousGestures={allGestures}>
       <GestureDetector gesture={panGesture}>
         <Animated.View
-          style={[wrapperStyle, style]}
+          style={[wrapperStyle, animStyle, style]}
           onLayout={({ nativeEvent: { layout } }) => {
             pageWidth.value = layout.width;
             pageHeight.value = layout.height;
