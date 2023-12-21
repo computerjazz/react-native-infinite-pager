@@ -144,17 +144,6 @@ function InfinitePager(
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
   const orientation = vertical ? "vertical" : "horizontal";
-  const [initIdx] = useState(() => {
-    if (initialIndex) {
-      return initialIndex;
-    } else if (minIndex > 0) {
-      return minIndex;
-    } else if (maxIndex < 0) {
-      return maxIndex;
-    } else {
-      return 0;
-    }
-  });
 
   const pageWidth = useSharedValue(width || 0);
   const pageHeight = useSharedValue(height || 0);
@@ -175,9 +164,9 @@ function InfinitePager(
   const translateY = useSharedValue(0);
   const translate = vertical ? translateY : translateX;
 
-  const [curIndex, setCurIndex] = useState(initIdx);
+  const [curIndex, setCurIndex] = useState(initialIndex);
 
-  const pageAnimInternal = useSharedValue(initIdx);
+  const pageAnimInternal = useSharedValue(initialIndex);
   const pageAnim = pageCallbackNode || pageAnimInternal;
 
   const { activePagers, nestingDepth, pagers } =
@@ -255,9 +244,9 @@ function InfinitePager(
 
   useDerivedValue(() => {
     if (pageSize.value) {
-      pageAnim.value = initIdx + (translate.value / pageSize.value) * -1;
+      pageAnim.value = initialIndex + (translate.value / pageSize.value) * -1;
     }
-  }, [pageSize, pageAnim, translate, initIdx]);
+  }, [pageSize, pageAnim, translate, initialIndex]);
 
   const onPageChangeInternal = useStableCallback((pg: number) => {
     onPageChange?.(pg);
@@ -384,7 +373,7 @@ function InfinitePager(
       }
 
       const rawVal = startTranslate.value + evtTranslate;
-      const page = initIdx + -rawVal / pageSize.value;
+      const page = initialIndex + -rawVal / pageSize.value;
       if (page >= minIndexAnim.value && page <= maxIndexAnim.value) {
         translate.value = rawVal;
       } else {
@@ -413,7 +402,7 @@ function InfinitePager(
       let velocityModifier = isFling ? pageSize.value / 2 : 0;
       if (evtVelocity < 0) velocityModifier *= -1;
       let page =
-        initIdx +
+        initialIndex +
         -1 * Math.round((translate.value + velocityModifier) / pageSize.value);
       if (page < minIndexAnim.value) page = minIndexAnim.value;
       if (page > maxIndexAnim.value) page = maxIndexAnim.value;
@@ -423,7 +412,10 @@ function InfinitePager(
         DEFAULT_ANIMATION_CONFIG,
         animCfgRef.current
       );
-      translate.value = withSpring(-(page - initIdx) * pageSize.value, animCfg);
+      translate.value = withSpring(
+        -(page - initialIndex) * pageSize.value,
+        animCfg
+      );
       if (debugTag) {
         console.log(
           `${debugTag}: onEnd (${
@@ -505,7 +497,7 @@ function InfinitePager(
                 pageInterpolatorRef={pageInterpolatorRef}
                 pageBuffer={pageBuffer}
                 debugTag={debugTag}
-                initIndex={initIdx}
+                initialIndex={initialIndex}
               />
             );
           })}
@@ -528,7 +520,7 @@ type PageWrapperProps = {
   pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
   pageBuffer: number;
   debugTag?: string;
-  initIndex: number;
+  initialIndex: number;
 };
 
 export type PageInterpolatorParams = {
@@ -554,7 +546,7 @@ const PageWrapper = React.memo(
     style,
     pageInterpolatorRef,
     pageBuffer,
-    initIndex,
+    initialIndex,
   }: PageWrapperProps) => {
     const pageSize = vertical ? pageHeight : pageWidth;
 
@@ -573,7 +565,7 @@ const PageWrapper = React.memo(
     const animStyle = useAnimatedStyle(() => {
       // Short circuit page interpolation to prevent buggy initial values due to possible race condition:
       // https://github.com/software-mansion/react-native-reanimated/issues/2571
-      const isInactivePageBeforeInit = index !== initIndex && !pageSize.value;
+      const isInactivePageBeforeInit = index !== initialIndex && !pageSize.value;
       const _pageWidth = isInactivePageBeforeInit ? focusAnim : pageWidth;
       const _pageHeight = isInactivePageBeforeInit ? focusAnim : pageHeight;
       return pageInterpolatorRef.current({
@@ -590,7 +582,7 @@ const PageWrapper = React.memo(
       pageHeight,
       pageAnim,
       index,
-      initIndex,
+      initialIndex,
       translation,
       vertical,
       pageBuffer,
