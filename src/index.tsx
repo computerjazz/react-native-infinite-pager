@@ -144,7 +144,7 @@ function InfinitePager(
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
   const orientation = vertical ? "vertical" : "horizontal";
-  const initIdx = useMemo(() => {
+  const [initIdx] = useState(() => {
     if (initialIndex) {
       return initialIndex;
     } else if (minIndex > 0) {
@@ -154,18 +154,22 @@ function InfinitePager(
     } else {
       return 0;
     }
-  }, [initialIndex, minIndex, maxIndex]);
+  });
 
   const pageWidth = useSharedValue(width || 0);
   const pageHeight = useSharedValue(height || 0);
   const pageSize = vertical ? pageHeight : pageWidth;
 
-  const onLayoutResolveRef = useRef((_val: number) => {});
-  const onLayoutPromiseRef = useRef(
-    new Promise<number>((resolve) => {
-      onLayoutResolveRef.current = resolve;
-    })
-  );
+  const [{ onLayoutPromise, onLayoutResolve }] = useState(() => {
+    let _r = (_val: number) => {};
+    const _p = new Promise<number>((resolve) => {
+      _r = resolve;
+    });
+    return {
+      onLayoutPromise: _p,
+      onLayoutResolve: _r,
+    };
+  });
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -211,7 +215,7 @@ function InfinitePager(
 
   const setPage = useStableCallback(
     async (index: number, options: ImperativeApiOptions = {}) => {
-      const layoutPageSize = await onLayoutPromiseRef.current;
+      const layoutPageSize = await onLayoutPromise;
       const pSize = pageSize.value || layoutPageSize;
       const updatedTranslate = index * pSize * -1;
 
@@ -384,9 +388,14 @@ function InfinitePager(
       if (page >= minIndexAnim.value && page <= maxIndexAnim.value) {
         translate.value = rawVal;
       } else {
-        const pageTrans = rawVal % pageSize.value;
-        const bounceTrans = pageTrans * (1 - bouncePct);
-        translate.value = rawVal - bounceTrans;
+        const referenceVal =
+          page < minIndexAnim.value ? minIndexAnim.value : maxIndexAnim.value;
+        const pageOverflowPct = referenceVal - page;
+        const overflowTrans = pageOverflowPct * pageSize.value;
+        const maxBounceTrans = bouncePct * pageSize.value;
+        const bounceTrans = pageOverflowPct * maxBounceTrans;
+        const clampedVal = rawVal - overflowTrans;
+        translate.value = clampedVal + bounceTrans;
       }
     })
     .onEnd((evt) => {
@@ -477,7 +486,7 @@ function InfinitePager(
           onLayout={({ nativeEvent: { layout } }) => {
             pageWidth.value = layout.width;
             pageHeight.value = layout.height;
-            onLayoutResolveRef.current(vertical ? layout.height : layout.width);
+            onLayoutResolve(vertical ? layout.height : layout.width);
           }}
         >
           {pageIndices.map((pageIndex) => {
