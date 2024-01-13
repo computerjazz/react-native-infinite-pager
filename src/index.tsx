@@ -79,6 +79,7 @@ export type InfinitePagerProps = {
     | React.MemoExoticComponent<InfinitePagerPageComponent>;
   renderPage?: InfinitePagerPageComponent;
   pageCallbackNode?: SharedValue<number>;
+  syncNode?: SharedValue<number>;
   onPageChange?: (page: number) => void;
   pageBuffer?: number; // number of pages to render on either side of active page
   style?: AnyStyle;
@@ -140,6 +141,7 @@ function InfinitePager(
     height,
     minDistance,
     initialIndex = 0,
+    syncNode,
   }: InfinitePagerProps,
   ref: React.ForwardedRef<InfinitePagerImperativeApi>
 ) {
@@ -160,9 +162,8 @@ function InfinitePager(
     };
   });
 
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const translate = vertical ? translateY : translateX;
+  const _translate = useSharedValue(0);
+  const translate = syncNode || _translate;
 
   const [curIndex, setCurIndex] = useState(initialIndex);
 
@@ -551,8 +552,8 @@ const PageWrapper = React.memo(
     const pageSize = vertical ? pageHeight : pageWidth;
 
     const translation = useDerivedValue(() => {
-      const translateX = (index - pageAnim.value) * pageSize.value;
-      return translateX;
+      const translate = (index - pageAnim.value) * pageSize.value;
+      return translate;
     }, []);
 
     const focusAnim = useDerivedValue(() => {
@@ -565,7 +566,8 @@ const PageWrapper = React.memo(
     const animStyle = useAnimatedStyle(() => {
       // Short circuit page interpolation to prevent buggy initial values due to possible race condition:
       // https://github.com/software-mansion/react-native-reanimated/issues/2571
-      const isInactivePageBeforeInit = index !== initialIndex && !pageSize.value;
+      const isInactivePageBeforeInit =
+        index !== initialIndex && !pageSize.value;
       const _pageWidth = isInactivePageBeforeInit ? focusAnim : pageWidth;
       const _pageHeight = isInactivePageBeforeInit ? focusAnim : pageHeight;
       return pageInterpolatorRef.current({
