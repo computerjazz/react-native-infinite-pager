@@ -66,6 +66,8 @@ export type InfinitePagerPageProps = {
   pageAnim: SharedValue<number>;
 };
 
+type SimultaneousGesture = ComposedGesture | GestureType;
+
 export type InfinitePagerPageComponent = (
   props: InfinitePagerPageProps
 ) => JSX.Element | null;
@@ -87,7 +89,7 @@ export type InfinitePagerProps = {
   pageInterpolator?: typeof defaultPageInterpolator;
   minIndex?: number;
   maxIndex?: number;
-  simultaneousGestures?: (ComposedGesture | GestureType)[];
+  simultaneousGestures?: SimultaneousGesture[];
   gesturesDisabled?: boolean;
   animationConfig?: Partial<WithSpringConfig>;
   flingVelocity?: number;
@@ -108,6 +110,7 @@ export type InfinitePagerImperativeApi = {
   setPage: (index: number, options: ImperativeApiOptions) => void;
   incrementPage: (options: ImperativeApiOptions) => void;
   decrementPage: (options: ImperativeApiOptions) => void;
+  gestureRef: React.MutableRefObject<GestureType | undefined>;
 };
 
 const EMPTY_SIMULTANEOUS_GESTURES: NonNullable<
@@ -166,6 +169,7 @@ function InfinitePager(
   const translate = syncNode || _translate;
 
   const [curIndex, setCurIndex] = useState(initialIndex);
+  const gestureRef = useRef<GestureType>();
 
   const pageAnimInternal = useSharedValue(initialIndex);
   const pageAnim = pageCallbackNode || pageAnimInternal;
@@ -234,6 +238,7 @@ function InfinitePager(
       decrementPage: (options?: ImperativeApiOptions) => {
         setPage(curIndexRef.current - 1, options);
       },
+      gestureRef,
     }),
     [setPage]
   );
@@ -442,7 +447,8 @@ function InfinitePager(
         );
       }
     })
-    .enabled(!gesturesDisabled);
+    .enabled(!gesturesDisabled)
+    .withRef(gestureRef);
 
   if (typeof minDistance === "number") {
     panGesture.minDistance(minDistance);
@@ -660,8 +666,6 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 });
-
-type SimultaneousGesture = ComposedGesture | GestureType;
 
 const InfinitePagerContext = React.createContext({
   activePagers: makeMutable([] as string[]),
