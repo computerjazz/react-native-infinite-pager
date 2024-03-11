@@ -211,7 +211,7 @@ function InfinitePager(
     async (index: number, options: ImperativeApiOptions = {}) => {
       const layoutPageSize = await onLayoutPromise;
       const pSize = pageSize.value || layoutPageSize;
-      const updatedTranslate = index * pSize * -1;
+      const updatedTranslate = (index * pSize * -1) + (initialIndex*pSize);
 
       if (index < minIndex || index > maxIndex) return;
 
