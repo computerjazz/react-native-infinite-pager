@@ -34,6 +34,9 @@ import {
 } from "./pageInterpolators";
 import { useStableCallback } from "./useStableCallback";
 
+// dummy value to translate pages offscreen before layout is known
+const preInitSize = makeMutable(99999);
+
 export enum Preset {
   SLIDE = "slide",
   CUBE = "cube",
@@ -211,7 +214,7 @@ function InfinitePager(
     async (index: number, options: ImperativeApiOptions = {}) => {
       const layoutPageSize = await onLayoutPromise;
       const pSize = pageSize.value || layoutPageSize;
-      const updatedTranslate = (index * pSize * -1) + (initialIndex*pSize);
+      const updatedTranslate = index * pSize * -1 + initialIndex * pSize;
 
       if (index < minIndex || index > maxIndex) return;
 
@@ -564,18 +567,19 @@ const PageWrapper = React.memo(
 
     const focusAnim = useDerivedValue(() => {
       if (!pageSize.value) {
-        return index;
+        return index - initialIndex;
       }
       return translation.value / pageSize.value;
-    }, []);
+    }, [initialIndex]);
 
     const animStyle = useAnimatedStyle(() => {
       // Short circuit page interpolation to prevent buggy initial values due to possible race condition:
       // https://github.com/software-mansion/react-native-reanimated/issues/2571
-      const isInactivePageBeforeInit =
-        index !== initialIndex && !pageSize.value;
-      const _pageWidth = isInactivePageBeforeInit ? focusAnim : pageWidth;
-      const _pageHeight = isInactivePageBeforeInit ? focusAnim : pageHeight;
+      const isInitialPage = index === initialIndex;
+      const hasInitialized = !!pageSize.value;
+      const isInactivePageBeforeInit = !isInitialPage && !hasInitialized;
+      const _pageWidth = isInactivePageBeforeInit ? preInitSize : pageWidth;
+      const _pageHeight = isInactivePageBeforeInit ? preInitSize : pageHeight;
       return pageInterpolatorRef.current({
         focusAnim,
         pageAnim,
