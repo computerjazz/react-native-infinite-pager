@@ -293,6 +293,9 @@ function InfinitePager(
   }, [curIndex, maxIndex]);
 
   const isAtEdge = isMinIndex || isMaxIndex;
+  const isAtEdgeAnim = useDerivedValue(() => {
+    return isAtEdge;
+  }, [isAtEdge]);
 
   const initTouchX = useSharedValue(0);
   const initTouchY = useSharedValue(0);
@@ -313,7 +316,7 @@ function InfinitePager(
   panGesture
     .onBegin((evt) => {
       "worklet";
-      if (!isAtEdge) {
+      if (!isAtEdgeAnim.value) {
         const updated = activePagers.value.slice();
         updated.push(pagerId);
         activePagers.value = updated;
