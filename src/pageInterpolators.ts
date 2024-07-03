@@ -6,8 +6,6 @@ import {
 } from "react-native-reanimated";
 import { PageInterpolatorParams } from ".";
 
-export const defaultPageInterpolator = pageInterpolatorSlide;
-
 export function pageInterpolatorSlide({
   focusAnim,
   pageWidth,
@@ -189,3 +187,5 @@ export function pageInterpolatorTurnIn({
     ],
   };
 }
+
+export const defaultPageInterpolator = pageInterpolatorSlide;
