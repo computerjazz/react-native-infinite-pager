@@ -675,8 +675,8 @@ const styles = StyleSheet.create({
 });
 
 const InfinitePagerContext = React.createContext({
-  activePagers: makeMutable([] as string[]),
-  pagers: makeMutable([] as string[]),
+  activePagers: makeMutable([] as string[]) as SharedValue<string[]>,
+  pagers: makeMutable([] as string[]) as SharedValue<string[]>,
   nestingDepth: -1,
 });
 
