@@ -197,14 +197,10 @@ function InfinitePager(
     };
   }, [pagerId, pagers]);
 
-  const pageInterpolatorRef = useRef(pageInterpolator);
-  pageInterpolatorRef.current = pageInterpolator;
-
   const curIndexRef = useRef(curIndex);
   curIndexRef.current = curIndex;
 
-  const animCfgRef = useRef(animationConfig);
-  animCfgRef.current = animationConfig;
+  const animCfgVal = useDerivedValue(() => animationConfig, [animationConfig]);
 
   const gesturesDisabledAnim = useDerivedValue(() => {
     return !!gesturesDisabled;
@@ -221,7 +217,7 @@ function InfinitePager(
       if (options.animated) {
         const animCfg = {
           ...DEFAULT_ANIMATION_CONFIG,
-          ...animCfgRef.current,
+          ...animCfgVal.value,
         } as WithSpringConfig;
 
         translate.value = withSpring(updatedTranslate, animCfg);
@@ -276,8 +272,6 @@ function InfinitePager(
 
   const startTranslate = useSharedValue(0);
 
-  const panGesture = useMemo(() => Gesture.Pan(), []);
-
   const minIndexAnim = useDerivedValue(() => {
     return minIndex;
   }, [minIndex]);
@@ -313,148 +307,185 @@ function InfinitePager(
     return activePagers.value.length && !isDeepestInOrientation;
   }, [activePagers, orientation]);
 
-  panGesture
-    .onBegin((evt) => {
-      "worklet";
-      if (!isAtEdgeAnim.value) {
-        const updated = activePagers.value.slice();
-        updated.push(pagerId);
-        activePagers.value = updated;
-      }
-      startTranslate.value = translate.value;
-      initTouchX.value = evt.x;
-      initTouchY.value = evt.y;
-      if (debugTag) {
-        console.log(`${debugTag} onBegin`, evt);
-      }
-    })
-    .onTouchesMove((evt, mgr) => {
-      "worklet";
-      const mainTouch = evt.changedTouches[0];
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .onBegin((evt) => {
+          "worklet";
+          if (!isAtEdgeAnim.value) {
+            const updated = activePagers.value.slice();
+            updated.push(pagerId);
+            activePagers.value = updated;
+          }
+          startTranslate.value = translate.value;
+          initTouchX.value = evt.x;
+          initTouchY.value = evt.y;
+          if (debugTag) {
+            console.log(`${debugTag} onBegin`, evt);
+          }
+        })
+        .onTouchesMove((evt, mgr) => {
+          "worklet";
+          const mainTouch = evt.changedTouches[0];
 
-      const evtVal = mainTouch[vertical ? "y" : "x"];
-      const initTouch = vertical ? initTouchY.value : initTouchX.value;
-      const evtTranslate = evtVal - initTouch;
+          const evtVal = mainTouch[vertical ? "y" : "x"];
+          const initTouch = vertical ? initTouchY.value : initTouchX.value;
+          const evtTranslate = evtVal - initTouch;
 
-      const swipingPastEnd =
-        (isMinIndex.value && evtTranslate > 0) ||
-        (isMaxIndex.value && evtTranslate < 0);
+          const swipingPastEnd =
+            (isMinIndex.value && evtTranslate > 0) ||
+            (isMaxIndex.value && evtTranslate < 0);
 
-      const shouldFailSelf =
-        (!bouncePct && swipingPastEnd) ||
-        isGestureLocked.value ||
-        gesturesDisabledAnim.value;
+          const shouldFailSelf =
+            (!bouncePct && swipingPastEnd) ||
+            isGestureLocked.value ||
+            gesturesDisabledAnim.value;
 
-      if (shouldFailSelf) {
-        if (debugTag) {
-          const failReason = swipingPastEnd ? "range" : "locked";
-          const failDetails = swipingPastEnd
-            ? `${isMinIndex.value ? "min" : "max"}, ${evtTranslate}`
-            : "";
-          console.log(`${debugTag}: ${failReason} fail (${failDetails})`, evt);
-          const updated = activePagers.value
+          if (shouldFailSelf) {
+            if (debugTag) {
+              const failReason = swipingPastEnd ? "range" : "locked";
+              const failDetails = swipingPastEnd
+                ? `${isMinIndex.value ? "min" : "max"}, ${evtTranslate}`
+                : "";
+              console.log(
+                `${debugTag}: ${failReason} fail (${failDetails})`,
+                evt
+              );
+              const updated = activePagers.value
+                .slice()
+                .filter((pId) => pId !== pagerId);
+              activePagers.value = updated;
+            }
+            mgr.fail();
+          } else {
+            if (!activePagers.value.includes(pagerId)) {
+              const updated = activePagers.value.slice();
+              updated.push(pagerId);
+              activePagers.value = updated;
+            }
+          }
+        })
+        .onUpdate((evt) => {
+          "worklet";
+          const evtTranslate = vertical ? evt.translationY : evt.translationX;
+          const crossAxisTranslate = vertical
+            ? evt.translationX
+            : evt.translationY;
+
+          const isSwipingCrossAxis =
+            Math.abs(crossAxisTranslate) > 10 &&
+            Math.abs(crossAxisTranslate) > Math.abs(evtTranslate);
+
+          if (isGestureLocked.value || isSwipingCrossAxis) return;
+
+          if (debugTag) {
+            console.log(
+              `${debugTag} onUpdate: ${
+                isGestureLocked.value ? "(locked)" : ""
+              }`,
+              evt
+            );
+          }
+
+          const rawVal = startTranslate.value + evtTranslate;
+          const page = initialIndex + -rawVal / pageSize.value;
+          if (page >= minIndexAnim.value && page <= maxIndexAnim.value) {
+            translate.value = rawVal;
+          } else {
+            const referenceVal =
+              page < minIndexAnim.value
+                ? minIndexAnim.value
+                : maxIndexAnim.value;
+            const pageOverflowPct = referenceVal - page;
+            const overflowTrans = pageOverflowPct * pageSize.value;
+            const maxBounceTrans = bouncePct * pageSize.value;
+            const bounceTrans = pageOverflowPct * maxBounceTrans;
+            const clampedVal = rawVal - overflowTrans;
+            translate.value = clampedVal + bounceTrans;
+          }
+        })
+        .onEnd((evt) => {
+          "worklet";
+          const evtVelocity = vertical ? evt.velocityY : evt.velocityX;
+          const evtTranslate = vertical ? evt.translationY : evt.translationX;
+          const crossAxisTranslate = vertical
+            ? evt.translationX
+            : evt.translationY;
+          const isSwipingCrossAxis =
+            Math.abs(crossAxisTranslate) > Math.abs(evtTranslate);
+
+          const isFling =
+            isGestureLocked.value || isSwipingCrossAxis
+              ? false
+              : Math.abs(evtVelocity) > flingVelocity;
+          let velocityModifier = isFling ? pageSize.value / 2 : 0;
+          if (evtVelocity < 0) velocityModifier *= -1;
+          let page =
+            initialIndex +
+            -1 *
+              Math.round((translate.value + velocityModifier) / pageSize.value);
+          if (page < minIndexAnim.value) page = minIndexAnim.value;
+          if (page > maxIndexAnim.value) page = maxIndexAnim.value;
+
+          const animCfg = Object.assign(
+            {},
+            DEFAULT_ANIMATION_CONFIG,
+            animCfgVal.value
+          );
+          translate.value = withSpring(
+            -(page - initialIndex) * pageSize.value,
+            animCfg
+          );
+          if (debugTag) {
+            console.log(
+              `${debugTag}: onEnd (${
+                isGestureLocked.value ? "locked" : "unlocked"
+              })`,
+              evt
+            );
+          }
+        })
+        .onFinalize((evt) => {
+          "worklet";
+          const updatedPagerIds = activePagers.value
             .slice()
-            .filter((pId) => pId !== pagerId);
-          activePagers.value = updated;
-        }
-        mgr.fail();
-      } else {
-        if (!activePagers.value.includes(pagerId)) {
-          const updated = activePagers.value.slice();
-          updated.push(pagerId);
-          activePagers.value = updated;
-        }
-      }
-    })
-    .onUpdate((evt) => {
-      "worklet";
-      const evtTranslate = vertical ? evt.translationY : evt.translationX;
-      const crossAxisTranslate = vertical ? evt.translationX : evt.translationY;
+            .filter((id) => id !== pagerId);
+          activePagers.value = updatedPagerIds;
 
-      const isSwipingCrossAxis =
-        Math.abs(crossAxisTranslate) > 10 &&
-        Math.abs(crossAxisTranslate) > Math.abs(evtTranslate);
+          if (debugTag) {
+            console.log(
+              `${debugTag}: onFinalize (${
+                isGestureLocked.value ? "locked" : "unlocked"
+              })`,
+              evt
+            );
+          }
+        }),
+    [
+      activePagers,
+      animCfgVal,
+      bouncePct,
+      debugTag,
+      flingVelocity,
+      gesturesDisabledAnim,
+      initTouchX,
+      initTouchY,
+      initialIndex,
+      isAtEdgeAnim,
+      isGestureLocked,
+      isMaxIndex,
+      isMinIndex,
+      maxIndexAnim,
+      minIndexAnim,
+      pageSize,
+      pagerId,
+      startTranslate,
+      translate,
+      vertical,
+    ]
+  );
 
-      if (isGestureLocked.value || isSwipingCrossAxis) return;
-
-      if (debugTag) {
-        console.log(
-          `${debugTag} onUpdate: ${isGestureLocked.value ? "(locked)" : ""}`,
-          evt
-        );
-      }
-
-      const rawVal = startTranslate.value + evtTranslate;
-      const page = initialIndex + -rawVal / pageSize.value;
-      if (page >= minIndexAnim.value && page <= maxIndexAnim.value) {
-        translate.value = rawVal;
-      } else {
-        const referenceVal =
-          page < minIndexAnim.value ? minIndexAnim.value : maxIndexAnim.value;
-        const pageOverflowPct = referenceVal - page;
-        const overflowTrans = pageOverflowPct * pageSize.value;
-        const maxBounceTrans = bouncePct * pageSize.value;
-        const bounceTrans = pageOverflowPct * maxBounceTrans;
-        const clampedVal = rawVal - overflowTrans;
-        translate.value = clampedVal + bounceTrans;
-      }
-    })
-    .onEnd((evt) => {
-      "worklet";
-      const evtVelocity = vertical ? evt.velocityY : evt.velocityX;
-      const evtTranslate = vertical ? evt.translationY : evt.translationX;
-      const crossAxisTranslate = vertical ? evt.translationX : evt.translationY;
-      const isSwipingCrossAxis =
-        Math.abs(crossAxisTranslate) > Math.abs(evtTranslate);
-
-      const isFling =
-        isGestureLocked.value || isSwipingCrossAxis
-          ? false
-          : Math.abs(evtVelocity) > flingVelocity;
-      let velocityModifier = isFling ? pageSize.value / 2 : 0;
-      if (evtVelocity < 0) velocityModifier *= -1;
-      let page =
-        initialIndex +
-        -1 * Math.round((translate.value + velocityModifier) / pageSize.value);
-      if (page < minIndexAnim.value) page = minIndexAnim.value;
-      if (page > maxIndexAnim.value) page = maxIndexAnim.value;
-
-      const animCfg = Object.assign(
-        {},
-        DEFAULT_ANIMATION_CONFIG,
-        animCfgRef.current
-      );
-      translate.value = withSpring(
-        -(page - initialIndex) * pageSize.value,
-        animCfg
-      );
-      if (debugTag) {
-        console.log(
-          `${debugTag}: onEnd (${
-            isGestureLocked.value ? "locked" : "unlocked"
-          })`,
-          evt
-        );
-      }
-    })
-    .onFinalize((evt) => {
-      "worklet";
-      const updatedPagerIds = activePagers.value
-        .slice()
-        .filter((id) => id !== pagerId);
-      activePagers.value = updatedPagerIds;
-
-      if (debugTag) {
-        console.log(
-          `${debugTag}: onFinalize (${
-            isGestureLocked.value ? "locked" : "unlocked"
-          })`,
-          evt
-        );
-      }
-    })
-    .enabled(!gesturesDisabled)
-    .withRef(gestureRef);
+  panGesture.enabled(!gesturesDisabled).withRef(gestureRef);
 
   if (typeof minDistance === "number") {
     panGesture.minDistance(minDistance);
@@ -507,7 +538,7 @@ function InfinitePager(
                 PageComponent={PageComponent}
                 renderPage={renderPage}
                 style={pageWrapperStyle}
-                pageInterpolatorRef={pageInterpolatorRef}
+                pageInterpolator={pageInterpolator}
                 pageBuffer={pageBuffer}
                 debugTag={debugTag}
                 initialIndex={initialIndex}
@@ -530,7 +561,7 @@ type PageWrapperProps = {
   renderPage?: InfinitePagerPageComponent;
   isActive: boolean;
   style?: AnyStyle;
-  pageInterpolatorRef: React.MutableRefObject<typeof defaultPageInterpolator>;
+  pageInterpolator: typeof defaultPageInterpolator;
   pageBuffer: number;
   debugTag?: string;
   initialIndex: number;
@@ -557,7 +588,7 @@ const PageWrapper = React.memo(
     renderPage,
     isActive,
     style,
-    pageInterpolatorRef,
+    pageInterpolator,
     pageBuffer,
     initialIndex,
   }: PageWrapperProps) => {
@@ -583,7 +614,7 @@ const PageWrapper = React.memo(
       const isInactivePageBeforeInit = !isInitialPage && !hasInitialized;
       const _pageWidth = isInactivePageBeforeInit ? preInitSize : pageWidth;
       const _pageHeight = isInactivePageBeforeInit ? preInitSize : pageHeight;
-      return pageInterpolatorRef.current({
+      return pageInterpolator({
         focusAnim,
         pageAnim,
         pageWidth: _pageWidth,
