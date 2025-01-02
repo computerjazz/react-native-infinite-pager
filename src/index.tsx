@@ -110,6 +110,7 @@ type ImperativeApiOptions = {
 };
 
 export type InfinitePagerImperativeApi = {
+  getPage: () => number;
   setPage: (index: number, options: ImperativeApiOptions) => void;
   incrementPage: (options: ImperativeApiOptions) => void;
   decrementPage: (options: ImperativeApiOptions) => void;
@@ -230,6 +231,7 @@ function InfinitePager(
   useImperativeHandle(
     ref,
     () => ({
+      getPage: () => curIndexRef.current,
       setPage,
       incrementPage: (options?: ImperativeApiOptions) => {
         setPage(curIndexRef.current + 1, options);
