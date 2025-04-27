@@ -11,7 +11,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "typecheck": "tsc --skipLibCheck --noEmit",
-    "build": "bob build",
+    "build": "bob build && node ./scripts/fix-exports.js",
     "lint": "eslint --ext .ts,.js,.tsx ."
   },
   "husky": {
