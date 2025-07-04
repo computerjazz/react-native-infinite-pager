@@ -488,7 +488,11 @@ function InfinitePager(
   panGesture.enabled(!gesturesDisabled).withRef(gestureRef);
 
   if (typeof minDistance === "number") {
-    panGesture.minDistance(minDistance);
+    if (vertical) {
+      panGesture.activeOffsetY([-minDistance, minDistance]);
+    } else {
+      panGesture.activeOffsetX([-minDistance, minDistance]);
+    }
   }
 
   const externalGestures = useMemo(() => {
