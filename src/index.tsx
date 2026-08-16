@@ -242,10 +242,12 @@ function InfinitePager(
     [setPage]
   );
 
-  const pageIndices = [...Array(pageBuffer * 2 + 1)].map((_, i) => {
-    const bufferIndex = i - pageBuffer;
-    return curIndex - bufferIndex;
-  });
+  const pageIndices = [...Array(pageBuffer * 2 + 1)]
+    .map((_, i) => {
+      const bufferIndex = i - pageBuffer;
+      return curIndex - bufferIndex;
+    })
+    .filter((index) => index >= minIndex && index <= maxIndex);
 
   useDerivedValue(() => {
     if (pageSize.value) {
